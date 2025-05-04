@@ -1,0 +1,8 @@
+{
+  "source": "hackernews",
+  "url": "https://thehackernews.com/2025/04/kimsuky-exploits-bluekeep-rdp.html",
+  "title": "Kimsuky Exploits BlueKeep RDP Vulnerability to Breach Systems in South Korea and Japan",
+  "published": "Apr 21, 2025Malware / Vulnerability",
+  "body": "Cybersecurity researchers have flagged a new malicious campaign related to the North Korean state-sponsored threat actor known as Kimsuky  that exploits a now-patched vulnerability impacting Microsoft Remote Desktop Services to gain initial access.  The activity has been named Larva-24005  by the AhnLab Security Intelligence Center (ASEC).  \"In some systems, initial access was gained through exploiting the RDP vulnerability (BlueKeep, CVE-2019-0708),\" the South Korean cybersecurity company said . \"While an RDP vulnerability scanner was found in the compromised system, there is no evidence of its actual use.\"   CVE-2019-0708  (CVSS score: 9.8) is a critical wormable bug  in Remote Desktop Services that could enable remote code execution, allowing unauthenticated attackers to install arbitrary programs, access data, and even create new accounts with full user rights.  However, in order for an adversary to exploit the flaw, they would need to send a specially crafted...",
+  "scraped_at": "2025-04-29T08:22:47.787320Z"
+}

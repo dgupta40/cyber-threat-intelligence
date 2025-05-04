@@ -1,0 +1,8 @@
+{
+  "source": "hackernews",
+  "url": "https://thehackernews.com/2025/04/apple-patches-two-actively-exploited.html",
+  "title": "Apple Patches Two Actively Exploited iOS Flaws Used in Sophisticated Targeted Attacks",
+  "published": null,
+  "body": "Apple on Wednesday released security updates for iOS, iPadOS, macOS Sequoia, tvOS, and visionOS to address two security flaws that it said have come under active exploitation in the wild.\nThe vulnerabilities in question are listed below -\nThe iPhone maker said it addressed CVE-2025-31200 with improved bounds checking and CVE-2025-31201 by removing the vulnerable section of code.\nBoth the vulnerabilities have been credited to Apple, along with Google Threat Analysis Group (TAG) for reporting CVE-2025-31200.\nApple, as is typically the case with such advisories, said it's aware that the issues have been \"exploited in an extremely sophisticated attack against specific targeted individuals on iOS.\"\nWith the latest development, Apple has addressed a total of five actively exploited zero-days in its software since the start of the year -\nThe updates are available for the following devices and operating systems -\nIn light of active exploitation, users are advised to update their devices to the latest version to safeguard against risks.",
+  "scraped_at": "2025-04-29T07:42:52.948101Z"
+}

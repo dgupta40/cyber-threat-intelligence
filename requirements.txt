@@ -1,0 +1,17 @@
+scrapy
+beautifulsoup4
+requests
+apscheduler
+pandas
+numpy
+scikit-learn
+spacy
+vaderSentiment
+transformers
+sentencepiece
+joblib
+streamlit
+plotly
+python-dotenv
+pytest
+python-dateutil

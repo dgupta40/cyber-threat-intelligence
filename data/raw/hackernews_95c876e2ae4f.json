@@ -1,0 +1,8 @@
+{
+  "source": "hackernews",
+  "url": "https://thehackernews.com/2025/04/cve-2025-24054-under-active.html",
+  "title": "CVE-2025-24054 Under Active Attack—Steals NTLM Credentials on File Download",
+  "published": "Apr 18, 2025Windows Security / Vulnerability",
+  "body": "The U.S. Cybersecurity and Infrastructure Security Agency (CISA) on Thursday added  a medium-severity security flaw impacting Microsoft Windows to its Known Exploited Vulnerabilities ( KEV ) catalog, following reports of active exploitation in the wild.  The vulnerability, assigned the CVE identifier CVE-2025-24054  (CVSS score: 6.5), is a Windows New Technology LAN Manager ( NTLM ) hash disclosure spoofing bug that was patched by Microsoft last month as part of its Patch Tuesday updates.   NTLM is a legacy authentication protocol that Microsoft officially deprecated last year in favor of Kerberos. In recent years, threat actors have found various methods to exploit the technology, such as pass-the-hash and relay attacks, to extract NTLM hashes for follow-on attacks.  \"Microsoft Windows NTLM contains an external control of file name or path vulnerability that allows an unauthorized attacker to perform spoofing over a network,\" CISA said.  In a bulletin published in March, Mi...",
+  "scraped_at": "2025-04-29T08:22:47.790319Z"
+}

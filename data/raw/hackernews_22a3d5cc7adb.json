@@ -1,0 +1,8 @@
+{
+  "source": "hackernews",
+  "url": "https://thehackernews.com/2025/04/toymaker-uses-lagtoy-to-sell-access-to.html",
+  "title": "ToyMaker Uses LAGTOY to Sell Access to CACTUS Ransomware Gangs for Double Extortion",
+  "published": "Apr 26, 2025Malware / Vulnerability",
+  "body": "Cybersecurity researchers have detailed the activities of an initial access broker (IAB) dubbed ToyMaker  that has been observed handing over access  to double extortion ransomware gangs like CACTUS .  The IAB has been assessed with medium confidence to be a financially motivated threat actor, scanning for vulnerable systems and deploying a custom malware called LAGTOY (aka HOLERUN).  \"LAGTOY can be used to create reverse shells and execute commands on infected endpoints,\" Cisco Talos researchers Joey Chen, Asheer Malhotra, Ashley Shen, Vitor Ventura, and Brandon White said .   The malware was first documented by Google-owned Mandiant in late March 2023, attributing its use to a threat actor it tracks as UNC961 . The activity cluster is also known by other names such as Gold Melody and Prophet Spider.  The threat actor has been observed leveraging a huge arsenal of known security flaws in internet-facing applications to obtain initial access, followed by conducting reconnai...",
+  "scraped_at": "2025-04-29T08:22:47.779318Z"
+}

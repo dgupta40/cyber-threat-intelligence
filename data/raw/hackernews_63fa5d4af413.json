@@ -1,0 +1,8 @@
+{
+  "source": "hackernews",
+  "url": "https://thehackernews.com/2025/04/researchers-identify-rackstatic.html",
+  "title": "Researchers Identify Rack::Static Vulnerability Enabling Data Breaches in Ruby Servers",
+  "published": "Apr 25, 2025Vulnerability / Data Breach",
+  "body": "Cybersecurity researchers have disclosed three security flaws in the Rack  Ruby web server interface that, if successfully exploited, could enable attackers to gain unauthorized access to files, inject malicious data, and tamper with logs under certain conditions.  The vulnerabilities, flagged  by cybersecurity vendor OPSWAT, are listed below -   CVE-2025-27610  (CVSS score: 7.5) - A path traversal vulnerability that could be used to gain access to all files under the specified root: directory, assuming an attacker can determine the paths to those files  CVE-2025-27111  (CVSS score: 6.9) - An improper neutralization of carriage return line feeds ( CRLF ) sequences and improper output neutralization for logs vulnerability that could be used to manipulate log entries and distort log files  CVE-2025-25184  (CVSS score: 5.7) - An improper neutralization of carriage return line feeds (CRLF) sequences and improper output neutralization for logs vulnerability that could be used to manipulate...",
+  "scraped_at": "2025-04-29T08:22:47.781318Z"
+}

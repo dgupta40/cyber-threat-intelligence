@@ -1,0 +1,8 @@
+{
+  "source": "hackernews",
+  "url": "https://thehackernews.com/2025/04/cisa-adds-actively-exploited-broadcom.html",
+  "title": "CISA Adds Actively Exploited Broadcom and Commvault Flaws to KEV Database",
+  "published": "Apr 29, 2025Vulnerability / Web Security",
+  "body": "The U.S. Cybersecurity and Infrastructure Security Agency (CISA) on Monday added  two high-severity security flaws impacting Broadcom Brocade Fabric OS and Commvault Web Server to its Known Exploited Vulnerabilities ( KEV ) catalog, citing evidence of active exploitation in the wild.  The vulnerabilities in question are listed below -   CVE-2025-1976  (CVSS score: 8.6) - A code injection flaw affecting Broadcom Brocade Fabric OS that allows a local user with administrative privileges to execute arbitrary code with full root privileges  CVE-2025-3928  (CVSS score: 8.7) - An unspecified flaw in the Commvault Web Server that allows a remote, authenticated attacker to create and execute web shells    \"Exploiting this vulnerability requires a bad actor to have authenticated user credentials within the Commvault Software environment,\" Commvault said  in an advisory released in February 2025.  \"Unauthenticated access is not exploitable. For software customers, this means your ...",
+  "scraped_at": "2025-04-29T08:22:47.774318Z"
+}

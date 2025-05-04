@@ -1,0 +1,8 @@
+{
+  "source": "hackernews",
+  "url": "https://thehackernews.com/2025/04/gcp-cloud-composer-bug-let-attackers.html",
+  "title": "GCP Cloud Composer Bug Let Attackers Elevate Access via Malicious PyPI Packages",
+  "published": "Apr 22, 2025Vulnerability / Cloud Security",
+  "body": "Cybersecurity researchers have detailed a now-patched vulnerability in Google Cloud Platform (GCP) that could have enabled an attacker to elevate their privileges in the Cloud Composer  workflow orchestration service that's based on Apache Airflow.  \"This vulnerability lets attackers with edit permissions in Cloud Composer to escalate their access to the default Cloud Build service account, which has high-level permissions across GCP services like Cloud Build  itself, Cloud Storage, and Artifact Registry,\" Liv Matan, senior security researcher at Tenable, said  in a report shared with The Hacker News.  The shortcoming has been codenamed ConfusedComposer by the cybersecurity company, describing it as a variant of ConfusedFunction , a privilege escalation vulnerability impacting GCP's Cloud Functions service that an attacker could exploit to access other services and sensitive data in an unauthorized manner.  The disclosure comes weeks after Tenable detailed another pr...",
+  "scraped_at": "2025-04-29T08:22:47.785320Z"
+}

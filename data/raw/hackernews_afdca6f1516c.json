@@ -1,0 +1,8 @@
+{
+  "source": "hackernews",
+  "url": "https://thehackernews.com/2025/04/dslogdrat-malware-deployed-via-ivanti.html",
+  "title": "DslogdRAT Malware Deployed via Ivanti ICS Zero-Day CVE-2025-0282 in Japan Attacks",
+  "published": "Apr 25, 2025Vulnerability / Network Security",
+  "body": "Cybersecurity researchers are warning about a new malware called DslogdRAT that's installed following the exploitation of a now-patched security flaw in Ivanti Connect Secure (ICS).  The malware, along with a web shell, were \"installed by exploiting a zero-day vulnerability at that time, CVE-2025-0282, during attacks against organizations in Japan around December 2024,\" JPCERT/CC researcher Yuma Masubuchi said  in a report published Thursday.  CVE-2025-0282  refers to a critical security flaw in ICS that could allow unauthenticated remote code execution. It was addressed by Ivanti in early January 2025.   However, the shortcoming has been exploited as a zero-day by a China-nexus cyber espionage group dubbed UNC5337 to deliver the SPAWN ecosystem of malware, as well as other tools like DRYHOOK and PHASEJAM. The deployment of the latter two malware strains has not been attributed to any known threat actor.  Since then, both JPCERT/CC and the U.S. Cybersecurity and Infrastr...",
+  "scraped_at": "2025-04-29T08:22:47.782318Z"
+}

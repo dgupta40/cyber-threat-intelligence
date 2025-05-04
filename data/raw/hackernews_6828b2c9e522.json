@@ -1,0 +1,8 @@
+{
+  "source": "hackernews",
+  "url": "https://thehackernews.com/2025/04/asus-confirms-critical-flaw-in-aicloud.html",
+  "title": "ASUS Confirms Critical Flaw in AiCloud Routers; Users Urged to Update Firmware",
+  "published": "Apr 19, 2025Network Security / Vulnerability",
+  "body": "ASUS has disclosed a critical security flaw impacting routers with AiCloud  enabled that could permit remote attackers to perform unauthorized execution of functions on susceptible devices.  The vulnerability, tracked as CVE-2025-2492 , has a CVSS score of 9.2 out of a maximum of 10.0.   \"An improper authentication control vulnerability exists in certain ASUS router firmware series,\" ASUS said  in an advisory. \"This vulnerability can be triggered by a crafted request, potentially leading to unauthorized execution of functions.\"  The shortcoming has been addressed with firmware updates for the following branches -   3.0.0.4_382  3.0.0.4_386  3.0.0.4_388, and  3.0.0.6_102   For optimal protection, it's recommended to update their instances to the latest version of the firmware.  \"Use different passwords for your wireless network and router administration page,\" ASUS said. \"Use passwords that have at least 10 characters, with a mix of capital letter...",
+  "scraped_at": "2025-04-29T08:22:47.789318Z"
+}

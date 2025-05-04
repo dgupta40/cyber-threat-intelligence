@@ -1,0 +1,8 @@
+{
+  "source": "hackernews",
+  "url": "https://thehackernews.com/2025/04/sap-confirms-critical-netweaver-flaw.html",
+  "title": "New Critical SAP NetWeaver Flaw Exploited to Drop Web Shell, Brute Ratel Framework",
+  "published": "Apr 25, 2025Vulnerability / Enterprise Security",
+  "body": "Threat actors are likely exploiting a new vulnerability in SAP NetWeaver to upload JSP web shells with the goal of facilitating unauthorized file uploads and code execution.   \"The exploitation is likely tied to either a previously disclosed vulnerability like CVE-2017-9844  or an unreported remote file inclusion (RFI) issue,\" ReliaQuest said  in a report published this week.  The cybersecurity company said the possibility of a zero-day stems from the fact that several of the impacted systems were already running the latest patches.   The flaw is assessed to be rooted in the \"/developmentserver/metadatauploader\" endpoint in the NetWeaver environment, enabling unknown threat actors to upload malicious JSP-based web shells in the \"servlet_jsp/irj/root/\" path for persistent remote access and deliver additional payloads.  Put differently, the lightweight JSP web shell is configured to upload unauthorized files, enable entrenched control over the infected host...",
+  "scraped_at": "2025-04-29T08:22:47.780318Z"
+}

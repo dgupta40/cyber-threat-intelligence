@@ -1,0 +1,8 @@
+{
+  "source": "hackernews",
+  "url": "https://thehackernews.com/2025/04/hackers-exploit-critical-craft-cms.html",
+  "title": "Hackers Exploit Critical Craft CMS Flaws; Hundreds of Servers Likely Compromised",
+  "published": "Apr 28, 2025Web Application Security / Vulnerability",
+  "body": "Threat actors have been observed exploiting two newly disclosed critical security flaws in Craft CMS in zero-day attacks to breach servers and gain unauthorized access.  The attacks, first observed  by Orange Cyberdefense SensePost on February 14, 2025, involve chaining the below vulnerabilities -   CVE-2024-58136  (CVSS score: 9.0) - An improper protection of alternate path flaw in the Yii PHP framework  used by Craft CMS that could be exploited to access restricted functionality or resources (A regression of CVE-2024-4990 )  CVE-2025-32432  (CVSS score: 10.0) - A remote code execution (RCE) vulnerability in Craft CMS (Patched in versions 3.9.15, 4.14.15, and 5.6.17)    According to the cybersecurity company, CVE-2025-32432 resides in a built-in image transformation feature that allows site administrators to keep images to a certain format.   \"CVE-2025-32432 relies on the fact that an unauthenticated user could send a POST request to the endpoint responsible for the image transf...",
+  "scraped_at": "2025-04-29T08:22:47.778318Z"
+}
