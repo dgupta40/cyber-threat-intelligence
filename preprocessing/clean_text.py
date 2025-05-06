@@ -1,5 +1,5 @@
 """
-End‑to‑end ETL for NVD + The Hacker News
+End‑to‑end ETL for NVD + The Hacker News
 ▸ Streams raw JSON  ▸ Cleans / tokenises  ▸ Enriches with CVSS‑bins, CWE one‑hots,
 ▸ Saves versioned Parquet master  ▸ Generates TF‑IDF + Word2Vec embeddings
 Incremental‑safe (processes only rows newer than last run).
@@ -23,6 +23,8 @@ import pyarrow.parquet as pq
 import pyarrow as pa
 from sklearn.feature_extraction.text import TfidfVectorizer
 from gensim.models import Word2Vec
+
+from utils.helpers import get_all_files, load_from_json, save_to_json
 
 
 # NLTK boot‑strap (quietly ignore if offline)
@@ -70,7 +72,7 @@ class TextPreprocessor:
     # Public entry‑point
     # ==========================================================================
     def process_all_sources(self) -> None:
-        self.logger.info("🚀 ETL run started")
+        self.logger.info(" ETL run started")
         hn_docs  = self._process_hackernews()
         nvd_docs = self._process_nvd()
         self._create_master_dataset(hn_docs, nvd_docs)
@@ -78,10 +80,10 @@ class TextPreprocessor:
         # record successful run timestamp
         with open(self.state_file, "w") as fh:
             fh.write(datetime.utcnow().isoformat())
-        self.logger.info("✅ ETL finished")
+        self.logger.info(" ETL finished")
 
     # ==========================================================================
-    # Hacker News
+    # Hacker News
     # ==========================================================================
     def _process_hackernews(self) -> List[Dict[str, Any]]:
         src_dir = os.path.join(self.raw_dir, "hackernews")
@@ -118,7 +120,7 @@ class TextPreprocessor:
 
         if docs:
             save_to_json(docs, os.path.join(self.processed_dir, "hackernews_processed.json"))
-            self.logger.info("📰 HackerNews processed: %d docs", len(docs))
+            self.logger.info("HackerNews processed: %d docs", len(docs))  # Remove emoji
         return docs
 
     # ==========================================================================
@@ -129,44 +131,50 @@ class TextPreprocessor:
         docs: List[Dict[str, Any]] = []
 
         for path in get_all_files(src_dir, ".json"):
-            data = load_from_json(path)
+            try:
+                with open(path, 'r', encoding='utf-8') as file:
+                    data = json.load(file)
+                
+                if isinstance(data, dict):
+                    if "vulnerabilities" in data:  # newer schema
+                        for item in data["vulnerabilities"]:
+                            cve_root = item.get("cve", {})
+                            cve_id = cve_root.get("id", "")
+                            pub_dt = self._parse_date(item.get("published"))
+                            if self.last_run and pub_dt and pub_dt <= self.last_run:
+                                continue
 
-            if "vulnerabilities" in data:                          # newer schema
-                for item in data["vulnerabilities"]:
-                    cve_root = item.get("cve", {})
-                    cve_id   = cve_root.get("id", "")
-                    pub_dt   = self._parse_date(item.get("published"))
-                    if self.last_run and pub_dt and pub_dt <= self.last_run:
-                        continue
+                            desc = next((d["value"]
+                                        for d in cve_root.get("descriptions", [])
+                                        if d.get("lang") == "en"), "")
+                            score, sev = self._extract_cvss(item.get("metrics", {}))
 
-                    desc = next((d["value"]
-                                 for d in cve_root.get("descriptions", [])
-                                 if d.get("lang") == "en"), "")
-                    score, sev = self._extract_cvss(item.get("metrics", {}))
+                            docs.append(self._build_nvd_doc(
+                                cve_id, desc, score, sev,
+                                pub_dt, self._parse_date(item.get("lastModified"))))
+                    elif "CVE_Items" in data:  # 1.1 schema
+                        for item in data.get("CVE_Items", []):
+                            cve_meta = item["cve"]["CVE_data_meta"]
+                            cve_id = cve_meta["ID"]
+                            pub_dt = self._parse_date(item.get("publishedDate"))
+                            if self.last_run and pub_dt and pub_dt <= self.last_run:
+                                continue
 
-                    docs.append(self._build_nvd_doc(
-                        cve_id, desc, score, sev,
-                        pub_dt, self._parse_date(item.get("lastModified"))))
-            else:                                                   # 1.1 schema
-                for item in data.get("CVE_Items", []):
-                    cve_meta = item["cve"]["CVE_data_meta"]
-                    cve_id   = cve_meta["ID"]
-                    pub_dt   = self._parse_date(item.get("publishedDate"))
-                    if self.last_run and pub_dt and pub_dt <= self.last_run:
-                        continue
+                            desc = next((d["value"]
+                                        for d in item["cve"]["description"]["description_data"]
+                                        if d["lang"] == "en"), "")
+                            score, sev = self._extract_cvss(item.get("impact", {}), legacy=True)
 
-                    desc = next((d["value"]
-                                 for d in item["cve"]["description"]["description_data"]
-                                 if d["lang"] == "en"), "")
-                    score, sev = self._extract_cvss(item.get("impact", {}), legacy=True)
-
-                    docs.append(self._build_nvd_doc(
-                        cve_id, desc, score, sev,
-                        pub_dt, self._parse_date(item.get("lastModifiedDate"))))
+                            docs.append(self._build_nvd_doc(
+                                cve_id, desc, score, sev,
+                                pub_dt, self._parse_date(item.get("lastModifiedDate"))))
+            except Exception as e:
+                self.logger.error(f"Error processing NVD file {path}: {str(e)}")
+                continue
 
         if docs:
             save_to_json(docs, os.path.join(self.processed_dir, "nvd_processed.json"))
-            self.logger.info("🛡️  NVD processed: %d CVEs", len(docs))
+            self.logger.info("NVD processed: %d CVEs", len(docs))  # Remove emoji
         return docs
 
     # ==========================================================================
@@ -175,7 +183,7 @@ class TextPreprocessor:
     def _create_master_dataset(self,
                                hn: List[Dict[str, Any]],
                                nvd: List[Dict[str, Any]]) -> None:
-        self.logger.info("🔗 Merging HackerNews ↔ NVD")
+        self.logger.info(" Merging HackerNews ↔ NVD")
 
         # explode HN on CVE list
         hn_rows = []
@@ -219,7 +227,7 @@ class TextPreprocessor:
         except OSError:
             pass
 
-        self.logger.info("📦 Master saved (%s rows) ➜ %s", len(master), dest)
+        self.logger.info("Master saved (%s rows) ➜ %s", len(master), dest)
 
     # ==========================================================================
     # Embeddings (TF‑IDF + Word2Vec)
@@ -250,7 +258,7 @@ class TextPreprocessor:
                              vector_size=300, window=5,
                              min_count=1, workers=4)
             model.save(os.path.join(self.processed_dir, "word2vec_model.bin"))
-        self.logger.info("🧠 Embeddings generated")
+        self.logger.info("Embeddings generated")
 
     # ==========================================================================
     # Helpers

@@ -1,0 +1,24 @@
+hackernews:
+  keep:
+    - url
+    - title
+    - date
+    - content
+    - tags
+    - cves
+nvd_v1_1:             # feeds with "CVE_Items"
+  keep:
+    - cve.CVE_data_meta.ID
+    - publishedDate
+    - lastModifiedDate
+    - cve.description.description_data
+    - impact.baseMetricV3.cvssV3
+    - impact.baseMetricV2.cvssV2
+nvd_jsonl:            # new feeds with "vulnerabilities"
+  keep:
+    - cve.id
+    - published
+    - lastModified
+    - cve.descriptions
+    - metrics.cvssMetricV31
+    - metrics.cvssMetricV2

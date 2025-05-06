@@ -57,9 +57,9 @@ def run_component(component_name, args):
                 combined = existing + new_items
                 with open(master, 'w', encoding='utf-8') as f:
                     json.dump(combined, f, indent=2, ensure_ascii=False)
-                logger.info(f"📰 Added {len(new_items)} new HackerNews articles.")
+                logger.info(f" Added {len(new_items)} new HackerNews articles.")
             else:
-                logger.info("📰 No new HackerNews articles found.")
+                logger.info(" No new HackerNews articles found.")
 
             # cleanup
             try:
@@ -74,9 +74,9 @@ def run_component(component_name, args):
             os.makedirs(os.path.dirname(nvd_output), exist_ok=True)
             nvd_scraper = NVDScraper(start_year=2019, history_file=nvd_output) # Using the logic from main.py
             if nvd_scraper.run():
-                logger.info(f"🔍 NVD: up‑to‑date (history in {nvd_output})")
+                logger.info(f" NVD: up‑to‑date (history in {nvd_output})")
             else:
-                logger.error("🔍 NVD: scrape failed")
+                logger.error(" NVD: scrape failed")
             logger.info("NVD scraping completed")
 
     elif component_name == "preprocess":

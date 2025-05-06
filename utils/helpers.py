@@ -86,15 +86,20 @@ def get_all_files(root: str,
 # ── JSON helpers ─────────────────────────────────────────────────────────
 def load_from_json(path: str) -> Any:
     """
-    Gzip‑aware JSON load.  Falls back to streaming for >200 MB files.
+    Gzip-aware JSON load. Falls back to streaming for >200 MB files.
     """
     opener = gzip.open if path.endswith((".gz", ".gzip")) else open
-    # heuristic: stream huge files instead of full read
-    if os.path.getsize(path) > 200 * 1024 * 1024:
-        with opener(path, "rb") as fh:
-            return ijson.items(fh, '')   # returns generator
-    with opener(path, "rt", encoding="utf‑8") as fh:
-        return json.load(fh)
+    try:
+        # heuristic: stream huge files instead of full read
+        if os.path.getsize(path) > 200 * 1024 * 1024:
+            with opener(path, "rb") as fh:
+                # Fully consume the generator to ensure the file is properly read and closed
+                return list(ijson.items(fh, ''))
+        with opener(path, "rt", encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception as e:
+        logging.warning(f"Error loading JSON file {path}: {str(e)}")
+        return {}
 
 
 def save_to_json(obj: Any, path: str, **json_kwargs) -> None:
