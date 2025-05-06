@@ -1,108 +1,192 @@
-"""
-Scrape the front page of The Hacker News and older pages if desired.
-• Primary selector:  div.body-post  (as in your Colab)
-• Fallback: scan all links for /YYYY/MM/ pattern when few articles are found
-• De-duplicates via utils.save_raw()
-"""
+import os
+import re
+import json
+import logging
+from datetime import datetime
 
-import datetime, time, re
+import scrapy
+from scrapy.crawler import CrawlerProcess
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin
-from utils.helpers import save_raw, safe_request
 
-BASE = "https://thehackernews.com/search/label/Vulnerability"
-ARTICLE_RE = re.compile(r"https://thehackernews\.com/\d{4}/\d{2}/")
+from utils.helpers import format_timestamp, safe_request
 
-def _extract_article(el):
-    """Pull title, link, date, description from a div.body-post block."""
-    story_link = el.select_one("a.story-link")
-    if not story_link:
-        return None
+class HackerNewsSpider(scrapy.Spider):
+    name = "hackernews_spider"
+    start_urls = ['https://thehackernews.com/search/label/Vulnerability']
 
-    link = story_link["href"]
-    if not ARTICLE_RE.match(link):
-        return None                      # skip promo links
+    def parse(self, response):
+        article_links = response.css('a.story-link::attr(href)').getall()
+        self.logger.info(f"Found {len(article_links)} article links on list page")
+        for link in article_links:
+            yield response.follow(link, callback=self.parse_article)
 
-    # title can be in img alt or other tags
-    img = el.select_one("img")
-    title = (img.get("alt") or "").strip() if img else ""
-    if not title:
-        cand = el.select_one(".home-title, .story-title, h1, h2, h3")
-        title = cand.get_text(strip=True) if cand else None
-    if not title:
-        return None
+        next_page = response.css('a.blog-pager-older-link-mobile::attr(href)').get()
+        if next_page:
+            yield response.follow(next_page, callback=self.parse)
 
-    date_el = el.select_one(".item-label, .story-time, time")
-    date = date_el.get_text(strip=True) if date_el else None
+    def parse_article(self, response):
+        # 1. Title
+        full_title = response.xpath('//title/text()').get(default='').strip()
+        title = full_title.split('–')[0].strip()
 
-    desc_el = el.select_one(".home-desc, .story-excerpt, p")
-    description = desc_el.get_text(strip=True) if desc_el else None
+        # 2. Date
+        html = response.text
+        m = re.search(r'([A-Za-z]+ \d{1,2}, \s*\d{4})', html)
+        if m:
+            try:
+                dt = datetime.strptime(m.group(1).strip(), '%B %d, %Y')
+                date = dt.strftime('%Y-%m-%d')
+            except Exception:
+                date = format_timestamp()
+        else:
+            date = format_timestamp()
 
-    return {
-        "source": "hackernews",
-        "url": link,
-        "title": title,
-        "published": date,
-        "body": description,
-        "scraped_at": datetime.datetime.utcnow().isoformat() + "Z",
-    }
+        # 3. Content
+        paragraphs = response.css('div.articlebody p::text').getall()
+        content = " ".join(p.strip() for p in paragraphs if p.strip())
 
-def _scrape_frontpage():
-    soup = BeautifulSoup(
-        safe_request(BASE).text,
-        "html.parser",
-    )
-    articles = []
-    for post in soup.select("div.body-post"):
-        art = _extract_article(post)
-        if art:
-            save_raw(art, "hackernews")
-            articles.append(art["url"])
-    return articles, soup
+        # 4. CVEs
+        cves = re.findall(r'CVE-\d{4}-\d{4,6}', content)
 
-def _fallback_scan(soup, already_saved):
-    """Scan all <a> tags for missed article links (rare)."""
-    for a in soup.find_all("a", href=True):
-        href = a["href"]
-        if href in already_saved or not ARTICLE_RE.match(href):
-            continue
-        title = (a.text or a.get("title") or "").strip()
-        if len(title) < 10:
-            continue
-        art = {
-            "source": "hackernews",
-            "url": href,
-            "title": title,
-            "published": None,
-            "body": None,
-            "scraped_at": datetime.datetime.utcnow().isoformat() + "Z",
+        # 5. Patched versions
+        patched_versions = []
+        for ul in response.css('div.articlebody ul'):
+            txt = " ".join(ul.css('li::text').getall())
+            if any(os in txt for os in ['iOS', 'macOS', 'tvOS', 'visionOS']):
+                patched_versions = [li.strip() for li in ul.css('li::text').getall()]
+
+        # 6. YouTube embeds
+        videos = response.css('div.articlebody iframe::attr(src)').re(r'.*youtube\.com.*')
+
+        # 7. Tags
+        tags = response.css('span.categ a span::text').getall()
+
+        yield {
+            'source': 'thehackernews',
+            'title': title,
+            'content': content,
+            'date': date,
+            'tags': tags,
+            'url': response.url,
+            'cves': cves,
+            'patched_versions': patched_versions,
+            'videos': videos
         }
-        save_raw(art, "hackernews")
-
-def scrape(pages: int = 2):        # <— crawl first 2 pages by default
-    print(f"🔎  Hacker News – Vulnerability (pages={pages})")
-    url = BASE
-    already_saved = set()
-    for p in range(pages):
-        saved, soup = _scrape_frontpage() if p == 0 else _scrape_page(url)
-        already_saved.update(saved)
-
-        next_link = soup.select_one("a.blog-pager-older-link")
-        if not next_link:
-            break
-        url = next_link["href"]
-        time.sleep(1)              # polite delay
-
-def _scrape_page(url):
-    soup = BeautifulSoup(safe_request(url).text, "html.parser")
-    articles = []
-    for post in soup.select("div.body-post"):
-        art = _extract_article(post)
-        if art:
-            save_raw(art, "hackernews")
-            articles.append(art["url"])
-    return articles, soup
 
 
-if __name__ == "__main__":
-    scrape()
+class HackerNewsScraper:
+    def __init__(self, method="scrapy"):
+        self.output_dir = 'data/raw/hackernews'
+        os.makedirs(self.output_dir, exist_ok=True)
+        self.logger = logging.getLogger(__name__)
+        self.method = method
+
+    def scrape_new(self, output_file):
+        """
+        Scrape into `output_file`, return list of all scraped items.
+        """
+        if self.method == "bs4":
+            articles = self._scrape_with_requests()
+            # write them out so main.py can load the same file
+            with open(output_file, 'w', encoding='utf-8') as f:
+                json.dump(articles, f, indent=2, ensure_ascii=False)
+            return articles
+        else:
+            # Scrapy path
+            self._scrape_with_scrapy(output_file)
+            with open(output_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+
+    def _scrape_with_scrapy(self, output_file):
+        """
+        Run the Scrapy spider and dump a JSON feed to `output_file`.
+        """
+        process = CrawlerProcess(settings={
+            'FEEDS': {
+                output_file: {'format': 'json'},
+            },
+            'LOG_LEVEL': 'ERROR',
+            'USER_AGENT': 'Mozilla/5.0 (compatible; HackerNewsBot/1.0)'
+        })
+        process.crawl(HackerNewsSpider)
+        process.start()
+
+    def _scrape_with_requests(self):
+        """
+        Pull pages via requests/BS4, return list of article dicts.
+        """
+        from utils.helpers import format_timestamp  # in case it got overwritten
+        base_url = 'https://thehackernews.com/search/label/Vulnerability'
+        articles = []
+        page_url = base_url
+
+        for _ in range(5):
+            resp = safe_request(page_url)
+            if not resp:
+                break
+            soup = BeautifulSoup(resp.text, 'html.parser')
+            links = [a['href'] for a in soup.select('a.story-link')]
+            for link in links:
+                art = self._parse_article_with_bs4(link)
+                if art:
+                    articles.append(art)
+            np = soup.select_one('a.blog-pager-older-link-mobile')
+            if np:
+                page_url = np['href']
+            else:
+                break
+
+        return articles
+
+    def _parse_article_with_bs4(self, url):
+        resp = safe_request(url)
+        if not resp:
+            return None
+        soup = BeautifulSoup(resp.text, 'html.parser')
+
+        # Title
+        title_tag = soup.find('title')
+        title = title_tag.text.split('–')[0].strip() if title_tag else ''
+
+        # Date
+        m = re.search(r'([A-Za-z]+ \d{1,2}, \s*\d{4})', resp.text)
+        if m:
+            try:
+                dt = datetime.strptime(m.group(1).strip(), '%B %d, %Y')
+                date = dt.strftime('%Y-%m-%d')
+            except:
+                date = format_timestamp()
+        else:
+            date = format_timestamp()
+
+        # Content
+        paras = soup.select('div.articlebody p')
+        content = " ".join(p.get_text(strip=True) for p in paras)
+
+        # CVEs
+        cves = re.findall(r'CVE-\d{4}-\d{4,6}', content)
+
+        # Patched versions
+        patched = []
+        for ul in soup.select('div.articlebody ul'):
+            txt = ul.get_text()
+            if any(os in txt for os in ['iOS', 'macOS', 'tvOS', 'visionOS']):
+                patched = [li.get_text(strip=True) for li in ul.select('li')]
+
+        # Videos
+        videos = [ifr['src'] for ifr in soup.select('div.articlebody iframe[src*="youtube.com"]')]
+
+        # Tags
+        tags = [t.get_text(strip=True) for t in soup.select('span.categ a span')]
+
+        return {
+            'source': 'thehackernews',
+            'title': title,
+            'content': content,
+            'date': date,
+            'tags': tags,
+            'url': url,
+            'cves': cves,
+            'patched_versions': patched,
+            'videos': videos
+        }

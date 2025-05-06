@@ -399,7 +399,8 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 
-# Ignore Python virtual environment
+# Ignore Python virtual environment and data folder
+data/
 .venv/
 
 # Ignore environment variable file

@@ -20,7 +20,7 @@ def enrich_with_wpscan(ref_url: str, base_doc: dict) -> dict:
         return base_doc
 
     advisory_id = m.group(1)
-    export_url   = f"https://wpscan.com/vulnerability/{advisory_id}.json"
+    export_url = f"https://wpscan.com/vulnerability/{advisory_id}/export/json"
     try:
         r = requests.get(export_url, timeout=15)
         r.raise_for_status()

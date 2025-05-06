@@ -1,54 +1,93 @@
-"""
-Scrape Krebs on Security front page + older-posts pagination.
-• Uses the h2.entry-title link list you verified in Colab
-• Each article URL pattern:  /YYYY/MM/DD/…
-"""
+# # scraper/krebsonsecurity_scraper.py
 
-import datetime, time, re
-from bs4 import BeautifulSoup
-from utils.helpers import save_raw, safe_request
+# import os
+# import json
+# import logging
+# from datetime import datetime
+# import scrapy
+# from scrapy.crawler import CrawlerProcess
+# from utils.helpers import format_timestamp
 
-SITE = "https://krebsonsecurity.com"
-ARTICLE_RE = re.compile(r"https://krebsonsecurity\.com/\d{4}/\d{2}/\d{2}/")
+# class KrebsOnSecuritySpider(scrapy.Spider):
+#     name = "krebsonsecurity_spider"
+#     start_urls = ['https://krebsonsecurity.com/']
 
-def _scrape_page(url):
-    soup = BeautifulSoup(safe_request(url).text, "html.parser")
+#     def parse(self, response):
+#         # updated selector for article links
+#         links = response.css('article.post h2.entry-title a::attr(href)').getall()
+#         for link in links:
+#             yield response.follow(link, callback=self.parse_article)
 
-    for h2 in soup.select("h2.entry-title"):
-        a = h2.find("a", href=True)
-        if not a:
-            continue
-        link = a["href"]
-        if not ARTICLE_RE.match(link):
-            continue
+#         # pagination
+#         nxt = response.css('a.next.page-numbers::attr(href)').get()
+#         if nxt:
+#             yield response.follow(nxt, callback=self.parse)
 
-        art = BeautifulSoup(safe_request(link).text, "html.parser")
-        title_tag = art.select_one("h1.entry-title")
-        body_div  = art.select_one("div.entry-content")
-        if not (title_tag and body_div):
-            continue
+#     def parse_article(self, response):
+#         title = response.css('h1.entry-title::text').get()
+#         # join all <p> under the entry-content container
+#         content = " ".join(response.css('div.entry-content p::text').getall()).strip()
 
-        item = {
-            "source": "krebsonsecurity",
-            "url": link,
-            "title": title_tag.get_text(strip=True),
-            "published": art.select_one("time.entry-date")["datetime"],
-            "body": "\n".join(p.get_text(" ", strip=True) for p in body_div.select("p")),
-            "scraped_at": datetime.datetime.utcnow().isoformat() + "Z",
-        }
-        save_raw(item, "krebsonsecurity")
-        print("✅ saved:", link)
+#         # date is in a <time> tag now
+#         date_str = response.css('time.entry-date::text').get()
+#         try:
+#             dt = datetime.strptime(date_str.strip(), '%B %d, %Y')
+#             date = dt.strftime('%Y-%m-%d')
+#         except:
+#             date = format_timestamp()
 
-    older = soup.select_one("a.older-posts")     # pagination link
-    return older["href"] if older else None
+#         # categories live under .cat-links
+#         categories = response.css('span.cat-links a::text').getall()
 
-def scrape(pages: int = 2):
-    url = SITE
-    for _ in range(pages):
-        url = _scrape_page(url)
-        if not url:
-            break
-        time.sleep(1)
+#         yield {
+#             'source':     'krebsonsecurity',
+#             'title':      title,
+#             'content':    content,
+#             'date':       date,
+#             'categories': categories,
+#             'url':        response.url
+#         }
 
-if __name__ == "__main__":
-    scrape()
+
+# class KrebsOnSecurityScraper:
+#     def __init__(self):
+#         self.output_dir = 'data/raw/krebsonsecurity'
+#         os.makedirs(self.output_dir, exist_ok=True)
+#         self.logger = logging.getLogger(__name__)
+
+#     def _run_spider(self, output_path):
+#         """Run the Scrapy spider and write to the given output_path, then return loaded items."""
+#         self.logger.info(f"Running KrebsOnSecuritySpider → {output_path}")
+#         process = CrawlerProcess(settings={
+#             'FEEDS': {
+#                 output_path: {'format': 'json', 'overwrite': True}
+#             },
+#             'LOG_LEVEL': 'ERROR',
+#             'USER_AGENT': 'Mozilla/5.0 (compatible; Bot/1.0)'
+#         })
+#         process.crawl(KrebsOnSecuritySpider)
+#         process.start()  # blocks until finished
+
+#         # read back in
+#         with open(output_path, 'r', encoding='utf-8') as f:
+#             return json.load(f)
+
+#     def scrape_new(self, temp_path):
+#         """
+#         Incremental interface: scrape into temp_path and return the list of items.
+#         """
+#         return self._run_spider(temp_path)
+
+#     def scrape_all(self):
+#         """
+#         One‑off full dump (timestamped file).
+#         """
+#         ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+#         out = os.path.join(self.output_dir, f'krebsonsecurity_{ts}.json')
+#         self._run_spider(out)
+
+
+# if __name__ == "__main__":
+#     logging.basicConfig(level=logging.INFO,
+#                         format='%(asctime)s %(levelname)s %(message)s')
+#     KrebsOnSecurityScraper().scrape_all()
