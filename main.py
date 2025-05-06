@@ -6,7 +6,7 @@ import argparse
 
 from scraper.hackernews_scraper import HackerNewsScraper
 from scraper.nvd_scraper       import NVDScraper
-from scraper.krebsonsecurity_scraper import KrebsOnSecurityScraper
+#from scraper.krebsonsecurity_scraper import KrebsOnSecurityScraper
 
 def scrape_hackernews(method: str):
     scraper = HackerNewsScraper(method=method)

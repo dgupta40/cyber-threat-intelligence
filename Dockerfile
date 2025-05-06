@@ -15,12 +15,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
     libpq-dev \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
 COPY requirements.txt .
-RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN pip install --upgrade pip \
+ && pip install -r requirements.txt
 
 # Copy all project files
 COPY . .
@@ -31,6 +32,11 @@ RUN mkdir -p data/raw data/processed models logs
 # Expose Streamlit port
 EXPOSE 8501
 
-# Entrypoint supports dashboard or pipeline
-CMD ["streamlit", "run", "dashboard/app.py"]
+# Copy and make our entrypoint executable
+# (This assumes you've added entrypoint.sh next to main.py.)
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
 
+# Use the entrypoint script; default to running the full pipeline
+ENTRYPOINT ["./entrypoint.sh"]
+CMD ["all"]

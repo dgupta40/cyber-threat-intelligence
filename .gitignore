@@ -399,10 +399,23 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 
-# Ignore Python virtual environment and data folder
-data/raw/
-data/processed/
+# Ignore Python virtual environment
 .venv/
 
 # Ignore environment variable file
 .env
+
+# Ignore ML model directories and files (but keep evaluations/)
+models/
+variables/
+*.pb
+*.pkl
+*.bin
+*.npz
+*.npy
+*.json
+
+# Ignore data folder and contents
+data/raw/
+data/processed/
+*.json.gz

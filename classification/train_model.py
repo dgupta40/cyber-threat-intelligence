@@ -144,7 +144,7 @@ class ThreatClassifier:
         df = pd.DataFrame(raw_data)
         
         # Assign initial threat categories for training
-        # This is a simplified approach - in a real system, you'd have labeled data
+        # This is a simplified approach - in a real system, we will have labeled data
         # Here we'll use keywords and metadata for initial labeling
         
         def assign_category(row):
