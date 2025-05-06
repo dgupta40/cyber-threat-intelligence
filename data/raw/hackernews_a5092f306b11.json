@@ -1,8 +1,0 @@
-{
-  "source": "hackernews",
-  "url": "https://thehackernews.com/2025/04/apple-patches-two-actively-exploited.html",
-  "title": "Apple Patches Two Actively Exploited iOS Flaws Used in Sophisticated Targeted Attacks",
-  "published": "Apr 17, 2025Zero-Day / Vulnerability",
-  "body": "Apple on Wednesday released  security updates for iOS, iPadOS, macOS Sequoia, tvOS, and visionOS to address two security flaws that it said have come under active exploitation in the wild.  The vulnerabilities in question are listed below -   CVE-2025-31200  (CVSS score: 7.5) - A memory corruption vulnerability in the Core Audio  framework that could allow code execution when processing an audio stream in a maliciously crafted media file  CVE-2025-31201  (CVSS score: 6.8) - A vulnerability in the RPAC component that could be used by an attacker with arbitrary read and write capability to bypass Pointer Authentication    The iPhone maker said it addressed CVE-2025-31200 with improved bounds checking and CVE-2025-31201 by removing the vulnerable section of code.  Both the vulnerabilities have been credited to Apple, along with Google Threat Analysis Group (TAG) for reporting CVE-2025-31200.  Apple, as is typically the case with such advisories, said it's aware that the issues have b...",
-  "scraped_at": "2025-04-29T08:22:47.793358Z"
-}

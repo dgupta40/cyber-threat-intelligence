@@ -1,8 +1,0 @@
-{
-  "source": "hackernews",
-  "url": "https://thehackernews.com/2025/04/critical-erlangotp-ssh-vulnerability.html",
-  "title": "Critical Erlang/OTP SSH Vulnerability (CVSS 10.0) Allows Unauthenticated Code Execution",
-  "published": "Apr 17, 2025Vulnerability / Network Security",
-  "body": "A critical security vulnerability has been disclosed in the Erlang/Open Telecom Platform (OTP)  SSH implementation that could permit an attacker to execute arbitrary code sans any authentication under certain conditions.  The vulnerability, tracked as CVE-2025-32433 , has been given the maximum CVSS score of 10.0.  \"The vulnerability allows an attacker with network access to an Erlang/OTP SSH server to execute arbitrary code without prior authentication,\" Ruhr University Bochum researchers Fabian Bäumer, Marcus Brinkmann, Marcel Maehren, and Jörg Schwenk said .   The issue stems from improper handling of SSH protocol messages that essentially permit an attacker to send connection protocol messages prior to authentication. Successful exploitation of the shortcomings could result in arbitrary code execution in the context of the SSH daemon .  Further exacerbating the risk, if the daemon process is running as root, it enables the attacker to have full control of the device, in ...",
-  "scraped_at": "2025-04-29T08:22:47.791320Z"
-}

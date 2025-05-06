@@ -1,8 +1,0 @@
-{
-  "source": "hackernews",
-  "url": "https://thehackernews.com/2025/04/hackers-abuse-russian-bulletproof-host.html",
-  "title": "Hackers Abuse Russian Bulletproof Host Proton66 for Global Attacks and Malware Delivery",
-  "published": "Apr 21, 2025Vulnerability / Threat Intelligence",
-  "body": "Cybersecurity researchers have disclosed a surge in \"mass scanning, credential brute-forcing, and exploitation attempts\" originating from IP addresses associated with a Russian bulletproof hosting service provider named Proton66 .  The activity, detected since January 8, 2025, targeted organizations worldwide, according to a two-part analysis published by Trustwave SpiderLabs last week.   \"Net blocks 45.135.232.0/24 and 45.140.17.0/24 were particularly active in terms of mass scanning and brute-force attempts,\" security researchers Pawel Knapczyk and Dawid Nesterowicz said . \"Several of the offending IP addresses were not previously seen to be involved in malicious activity or were inactive for over two years.\"  The Russian autonomous system Proton66 is assessed  to be linked to another autonomous system named PROSPERO. Last year, French security firm Intrinsec detailed their connections to bulletproof services marketed on Russian cybercrime forums under ...",
-  "scraped_at": "2025-04-29T08:22:47.788322Z"
-}

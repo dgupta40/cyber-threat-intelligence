@@ -1,8 +1,0 @@
-{
-  "source": "hackernews",
-  "url": "https://thehackernews.com/2025/04/159-cves-exploited-in-q1-2025-283.html",
-  "title": "159 CVEs Exploited in Q1 2025 — 28.3% Within 24 Hours of Disclosure",
-  "published": "Apr 24, 2025Vulnerability / Threat Intelligence",
-  "body": "As many as 159 CVE identifiers have been flagged as exploited in the wild in the first quarter of 2025, up from 151 in Q4 2024.  \"We continue to see vulnerabilities being exploited at a fast pace with 28.3% of vulnerabilities being exploited within 1-day of their CVE disclosure,\" VulnCheck said in a report  shared with The Hacker News.  This translates to 45 security flaws that have been weaponized in real-world attacks within a day of disclosure. Fourteen other flaws have been exploited within a month, while another 45 flaws were abused within the span of a year.   The cybersecurity company said a majority of the exploited vulnerabilities have been identified in content management systems (CMSes), followed by network edge devices, operating systems, open-source software, and server software.   The breakdown is as follows -   Content Management Systems (CMS) (35)  Network Edge Devices (29)  Operating Systems (24)  Open Source Software (14)  Server Software (14)   The leading...",
-  "scraped_at": "2025-04-29T08:22:47.783319Z"
-}

@@ -1,8 +1,0 @@
-{
-  "source": "hackernews",
-  "url": "https://thehackernews.com/2025/04/critical-commvault-command-center-flaw.html",
-  "title": "Critical Commvault Command Center Flaw Enables Attackers to Execute Code Remotely",
-  "published": "Apr 24, 2025Data Breach / Vulnerability",
-  "body": "A critical security flaw has been disclosed in the Commvault Command Center that could allow arbitrary code execution on affected installations.  The vulnerability, tracked as CVE-2025-34028 , carries a CVSS score of 9.0 out of a maximum of 10.0.  \"A critical security vulnerability has been identified in the Command Center installation, allowing remote attackers to execute arbitrary code without authentication,\" Commvault said  in an advisory published on April 17, 2025. \"This vulnerability could lead to a complete compromise of the Command Center environment.\"   It impacts the 11.38 Innovation Release, from versions 11.38.0 through 11.38.19, and has been resolved in the following versions -   11.38.20  11.38.25   watchTowr Labs researcher Sonny Macdonald, who has been credited with discovering and reporting the flaw on April 7, 2025, said  in a report shared with The Hacker News that it could be exploited to achieve pre-authenticated remote code execution.  Specif...",
-  "scraped_at": "2025-04-29T08:22:47.784319Z"
-}
