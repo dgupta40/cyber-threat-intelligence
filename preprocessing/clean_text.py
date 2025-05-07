@@ -183,7 +183,7 @@ class TextPreprocessor:
     def _create_master_dataset(self,
                                hn: List[Dict[str, Any]],
                                nvd: List[Dict[str, Any]]) -> None:
-        self.logger.info(" Merging HackerNews ↔ NVD")
+        self.logger.info(" Merging HackerNews and NVD")
 
         # explode HN on CVE list
         hn_rows = []
@@ -208,26 +208,21 @@ class TextPreprocessor:
         master["cvss_bin"]   = master["cvss_score"].apply(self._cvss_to_bin)
 
         # CWE one‑hot set ➜ JSON‑encoded dict (sparse)
+
         def cwe_onehot(meta):
             if not isinstance(meta, dict): return {}
             cwes = meta.get("cwe") or []
-            return {f"CWE_{c}": 1 for c in cwes}
+            result = {f"CWE_{c}": 1 for c in cwes}
+            # Add a dummy field if the dictionary is empty
+            if not result:
+                result["dummy"] = 0
+            return result
         master["cwe_onehot"] = master["metadata_nvd"].apply(cwe_onehot)
 
-        stamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-        dest  = os.path.join(self.processed_dir, f"master_{stamp}.parquet")
+        dest = os.path.join(self.processed_dir, "master.parquet")
         table = pa.Table.from_pandas(master, preserve_index=False)
         pq.write_table(table, dest, compression="zstd")
-        # update symlink
-        latest = os.path.join(self.processed_dir, "master_latest.parquet")
-        try:
-            if os.path.islink(latest) or os.path.exists(latest):
-                os.remove(latest)
-            os.symlink(os.path.relpath(dest, self.processed_dir), latest)
-        except OSError:
-            pass
-
-        self.logger.info("Master saved (%s rows) ➜ %s", len(master), dest)
+        self.logger.info("Master saved (%s rows) to master.parquet", len(master))
 
     # ==========================================================================
     # Embeddings (TF‑IDF + Word2Vec)
