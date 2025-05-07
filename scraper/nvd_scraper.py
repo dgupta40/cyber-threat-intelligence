@@ -31,7 +31,7 @@ class NVDScraper:
     
     def backfill_history(self):
         """
-        ONE‐TIME: Download and combine year‐by‐year JSON feeds
+        ONE-TIME: Download and combine year-by-year JSON feeds
         from start_year through current year.
         """
         self.logger.info(f"Backfilling CVEs from {self.start_year} to today")
@@ -54,7 +54,7 @@ class NVDScraper:
             with gzip.open(gzfp, 'rt', encoding='utf-8') as f:
                 data = json.load(f)
             items = data.get('CVE_Items', [])
-            self.logger.info(f"  year={year} → {len(items)} items")
+            self.logger.info(f"  year={year} -> {len(items)} items")
             
             # dedupe into dict by CVE ID
             for item in items:
@@ -71,7 +71,7 @@ class NVDScraper:
             'CVE_Items': list(cve_dict.values())
         }
         save_to_json(history, self.history_path)
-        self.logger.info(f"Backfill complete: {len(cve_dict)} unique CVEs → {self.history_path}")
+        self.logger.info(f"Backfill complete: {len(cve_dict)} unique CVEs -> {self.history_path}")
     
     def incremental_update(self):
         """
@@ -96,7 +96,7 @@ class NVDScraper:
         pub_start = (latest_dt + timedelta(seconds=1)).strftime("%Y-%m-%dT%H:%M:%S.000")
         pub_end   = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000")
         
-        self.logger.info(f"Fetching incremental CVEs: {pub_start} → {pub_end}")
+        self.logger.info(f"Fetching incremental CVEs: {pub_start} -> {pub_end}")
         
         # call the API
         params = {

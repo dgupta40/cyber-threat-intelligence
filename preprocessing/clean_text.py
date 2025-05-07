@@ -1,11 +1,11 @@
 """
-clean_text.py — Pre‑process raw scraped data for modelling.
+clean_text.py — Pre-process raw scraped data for modelling.
 
 Pipeline
 1. Load *new* raw JSON/JSONL files.
-2. Clean HTML → tokens.
+2. Clean HTML -> tokens.
 3. Pull CVSS scores (flat + nested) → severity_bin.
-4. TF‑IDF  ·  Word2Vec  ·  SBERT embeddings.
+4. TF-IDF  ·  Word2Vec  ·  SBERT embeddings.
 5. Sentiment polarity.
 6. Save artefacts + master_<timestamp>.parquet.
 """
@@ -122,7 +122,7 @@ def main() -> str:
 
     df = load_raw_newer_than(last_ts)
     if df.empty:
-        logging.info("No new raw data – exiting.")
+        logging.info("No new raw data - exiting.")
         return str(latest) if latest else ""
 
     logging.info(f"Loaded {len(df):,} raw rows")
@@ -164,13 +164,13 @@ def main() -> str:
     X_tfidf = tfidf.fit_transform(df["clean_text"])
     tfidf_path = MODEL_DIR / f"tfidf_{datetime.utcnow():%Y%m%d_%H%M}.pkl"
     pd.to_pickle({"model": tfidf, "matrix": X_tfidf}, tfidf_path)
-    logging.info(f"Saved TF‑IDF → {tfidf_path}")
+    logging.info(f"Saved TF-IDF -> {tfidf_path}")
 
     # ── Word2Vec ──────────────────────────────────────────────────────
     w2v = Word2Vec(df["tokens"], vector_size=200, window=5, sg=1, min_count=3)
     w2v_path = MODEL_DIR / f"w2v_{datetime.utcnow():%Y%m%d_%H%M}.model"
     w2v.save(str(w2v_path))
-    logging.info(f"Saved Word2Vec → {w2v_path}")
+    logging.info(f"Saved Word2Vec -> {w2v_path}")
 
     # ── SBERT embeddings ─────────────────────────────────────────────
     logging.info("Encoding SBERT …")
