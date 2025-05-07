@@ -196,6 +196,7 @@ def main():
         ]
     )
 
+
     logger = logging.getLogger(__name__)
     logger.info(f"Starting Cyber Threat Intelligence System - Component: {args.component}")
 
