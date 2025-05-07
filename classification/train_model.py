@@ -123,25 +123,87 @@ class ThreatClassifier:
     def _load_and_prepare_data(self):
         """
         Load and prepare data for training.
-        
+    
         Returns:
-            dict: Prepared data dictionary
+        dict: Prepared data dictionary
         """
         self.logger.info("Loading and preparing data for training")
         
-        # Load combined dataset
-        combined_file = os.path.join(self.processed_dir, 'combined_dataset.json')
-        if not os.path.exists(combined_file):
-            self.logger.warning(f"Combined dataset not found: {combined_file}")
-            return None
+        # Try loading the Parquet file first
+        master_file = os.path.join(self.processed_dir, 'master.parquet')
+        if os.path.exists(master_file):
+            self.logger.info(f"Loading data from Parquet file: {master_file}")
+            try:
+                import pandas as pd
+                df = pd.read_parquet(master_file)
+                
+                # Extract relevant columns - we need content for training
+                # First check which content columns we have
+                content_cols = []
+                if 'content_thn' in df.columns:
+                    content_cols.append('content_thn')
+                if 'content_nvd' in df.columns:
+                    content_cols.append('content_nvd')
+                
+                # Create a combined content column if we have multiple sources
+                if len(content_cols) > 1:
+                    df['content'] = df[content_cols[0]].fillna('')
+                    for col in content_cols[1:]:
+                        df['content'] = df['content'] + ' ' + df[col].fillna('')
+                    df['content'] = df['content'].str.strip()
+                elif len(content_cols) == 1:
+                    df['content'] = df[content_cols[0]]
+                else:
+                    self.logger.error("No content columns found in the data")
+                    return None
+                
+                # Create a title column from available title columns
+                title_cols = []
+                if 'title_thn' in df.columns:
+                    title_cols.append('title_thn')
+                if 'title_nvd' in df.columns:
+                    title_cols.append('title_nvd')
+                
+                if len(title_cols) > 0:
+                    df['title'] = df[title_cols[0]].fillna('')
+                else:
+                    df['title'] = ''
+                
+                self.logger.info(f"Loaded {len(df)} records from Parquet file")
+            except Exception as e:
+                self.logger.error(f"Error loading Parquet file: {str(e)}")
+                return None
+        # Fall back to looking for JSON files
+        else:
+            # Try looking for individual processed files
+            hackernews_file = os.path.join(self.processed_dir, 'hackernews_processed.json')
+            nvd_file = os.path.join(self.processed_dir, 'nvd_processed.json')
             
-        raw_data = load_from_json(combined_file)
-        if not raw_data:
-            self.logger.warning("Empty dataset")
-            return None
+            hackernews_data = []
+            nvd_data = []
             
-        # Create dataframe
-        df = pd.DataFrame(raw_data)
+            if os.path.exists(hackernews_file):
+                hackernews_data = load_from_json(hackernews_file)
+                self.logger.info(f"Loaded {len(hackernews_data)} records from HackerNews")
+            
+            if os.path.exists(nvd_file):
+                nvd_data = load_from_json(nvd_file)
+                self.logger.info(f"Loaded {len(nvd_data)} records from NVD")
+            
+            if not hackernews_data and not nvd_data:
+                self.logger.error("No data sources found")
+                return None
+                
+            # Combine data sources
+            combined_data = hackernews_data + nvd_data
+            df = pd.DataFrame(combined_data)
+        
+        # Make sure we have the minimum required columns
+        required_cols = ['content', 'title']
+        for col in required_cols:
+            if col not in df.columns:
+                self.logger.error(f"Required column '{col}' not found in data")
+                return None
         
         # Assign initial threat categories for training
         # This is a simplified approach - in a real system, we will have labeled data
@@ -178,6 +240,9 @@ class ThreatClassifier:
         
         # Assign categories
         df['category'] = df.apply(assign_category, axis=1)
+        
+        # Drop rows with empty content
+        df = df.dropna(subset=['content'])
         
         # Split data
         X_train, X_test, y_train, y_test = train_test_split(
