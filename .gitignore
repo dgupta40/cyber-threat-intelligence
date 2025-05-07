@@ -404,6 +404,7 @@ FodyWeavers.xsd
 
 # Ignore environment variable file
 .env
+__pycache__/
 
 # Ignore ML model directories and files (but keep evaluations/)
 models/
