@@ -1,6 +1,6 @@
 """
 Train baseline severity classifier
-Features : TF‑IDF (sparse)
+Features : TF-IDF (sparse)
 Target   : severity_bin  (critical / high / medium / low)
 Model    : LogisticRegression
 Outputs  : models/severity_lr.pkl
