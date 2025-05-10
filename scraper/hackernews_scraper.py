@@ -42,23 +42,32 @@ class HackerNewsSpider(scrapy.Spider):
         # Timestamp when scraped
         ingest_ts_thn = datetime.utcnow().isoformat()
 
-        # Parse publication date
+        # Parse publication date with various formats
         date = None
         date_text = response.xpath("//meta[@property='article:published_time']/@content").get() or ''
-        for pat in ('%Y-%m-%dT%H:%M:%SZ', '%B %d, %Y'):
+        for pat in ('%Y-%m-%dT%H:%M:%SZ', '%B %d, %Y', '%b %d, %Y'):
             try:
                 dt = datetime.strptime(date_text.strip(), pat)
                 date = dt.strftime('%Y-%m-%d')
                 break
             except Exception:
                 continue
+
+        # Fallback regex extraction for non-meta dates
         if not date:
-            m = re.search(r'([A-Za-z]+ \d{1,2},\s*\d{4})', response.text)
-            if m:
-                dt = datetime.strptime(m.group(1).strip(), '%B %d, %Y')
-                date = dt.strftime('%Y-%m-%d')
+            match = re.search(r'([A-Za-z]{3,9} \d{1,2},\s*\d{4})', response.text)
+            if match:
+                dt_str = match.group(1).strip()
+                for pat in ('%B %d, %Y', '%b %d, %Y'):
+                    try:
+                        dt = datetime.strptime(dt_str, pat)
+                        date = dt.strftime('%Y-%m-%d')
+                        break
+                    except Exception:
+                        continue
+
         if not date:
-            self.logger.warning(f"Unparseable date on {response.url}")
+            self.logger.warning(f"Unparseable date on {response.url}, defaulting to current date")
             date = datetime.utcnow().strftime('%Y-%m-%d')
 
         # Title
@@ -69,12 +78,56 @@ class HackerNewsSpider(scrapy.Spider):
         paragraphs = response.css('div.articlebody p::text').getall()
         body = " ".join(p.strip() for p in paragraphs if p.strip())
 
+        # Full text of the page for more comprehensive extraction
+        full_text = response.xpath('//text()').getall()
+        full_text = " ".join(full_text)
+
         # Prepend title to content for richer text field
         text = f"{title}. {body}"
 
         # Extract CVE IDs, normalized
-        raw_cves = re.findall(r'(CVE-\d{4}-\d{4,6})', body, flags=re.IGNORECASE)
+        raw_cves = re.findall(r'(CVE-\d{4}-\d{4,6})', full_text, flags=re.IGNORECASE)
         cves = [cve.upper() for cve in raw_cves]
+
+        # Extract affected products
+        products = []
+        # Common product patterns
+        product_patterns = [
+            r'affects?\s+([A-Za-z0-9\s\-\.]+)\s+version\s*([0-9\.\-\s]+)',
+            r'([A-Za-z0-9\s\-\.]+)\s+version\s*([0-9\.\-\s]+)\s+(?:is\s+)?(?:vulnerable|affected)',
+            r'vulnerable\s+versions?\s+of\s+([A-Za-z0-9\s\-\.]+)',
+            r'([A-Za-z0-9\s\-\.]+)\s+(?:versions?\s*)?(?:before|prior\s+to|up\s+to)\s+([0-9\.\-\s]+)',
+        ]
+        
+        for pattern in product_patterns:
+            matches = re.finditer(pattern, full_text, re.IGNORECASE)
+            for match in matches:
+                product_name = match.group(1).strip()
+                if len(match.groups()) > 1:
+                    version = match.group(2).strip()
+                    products.append(f"{product_name} {version}")
+                else:
+                    products.append(product_name)
+        
+        # Also look for standalone product mentions near vulnerability keywords
+        if not products:
+            # Common software names that might be mentioned
+            common_products = [
+                'Windows', 'Linux', 'Android', 'iOS', 'Chrome', 'Firefox', 
+                'Safari', 'Edge', 'Apache', 'Nginx', 'WordPress', 'Drupal',
+                'Jenkins', 'Docker', 'Kubernetes', 'OpenSSL', 'Java', 'Python',
+                'PHP', 'MySQL', 'PostgreSQL', 'MongoDB', 'Redis', 'Elasticsearch'
+            ]
+            
+            for product in common_products:
+                if re.search(rf'\b{product}\b', full_text, re.IGNORECASE):
+                    # Check if it's in context of vulnerability
+                    context_pattern = rf'(?:vulnerability|flaw|bug|exploit|affected|vulnerable)[\s\S]{{0,50}}\b{product}\b'
+                    if re.search(context_pattern, full_text, re.IGNORECASE):
+                        products.append(product)
+
+        # Remove duplicates and clean up
+        products = list(set(p.strip() for p in products if p.strip()))
 
         # Extract tags
         tags = response.css('span.categ a span::text').getall()
@@ -83,6 +136,7 @@ class HackerNewsSpider(scrapy.Spider):
             'source': 'The Hacker News',
             'text': text,
             'published_date': date,
+            'products': products,
             'tags': tags,
             'url': response.url,
             'cves': cves,
@@ -91,12 +145,12 @@ class HackerNewsSpider(scrapy.Spider):
 
 
 class HackerNewsScraper:
-    """Scraper with incremental update for TheHackerNews vulnerability label using Scrapy."""
+    """Scraper with incremental update for The Hacker News vulnerability label using Scrapy."""
 
+    # Updated keys without cvss_score, severity, and cwe
     REQUIRED_KEYS = {
-        'source', 'title', 'content',
-        'date', 'tags', 'url',
-        'cves', 'ingest_ts_thn'
+        'source', 'text', 'published_date', 
+        'products', 'tags', 'url', 'cves', 'ingest_ts_thn'
     }
 
     def __init__(self, history_file: str = 'data/raw/hackernews/hackernews.json'):
@@ -106,9 +160,6 @@ class HackerNewsScraper:
         self.logger = logging.getLogger(__name__)
 
     def scrape_new(self, temp_file: str) -> list[dict]:
-        """
-        Run Scrapy spider and dump JSON feed to temp_file (fresh each time).
-        """
         # Remove leftover temp file to ensure clean overwrite
         if os.path.exists(temp_file):
             try:
@@ -116,7 +167,7 @@ class HackerNewsScraper:
             except OSError as e:
                 self.logger.warning(f"Could not remove existing temp file {temp_file}: {e}")
 
-        # Tell Scrapy to overwrite the feed file
+        # Configure feed export
         feed_opts = {'format': 'json', 'overwrite': True}
         settings = {'FEEDS': {temp_file: feed_opts}, **HackerNewsSpider.custom_settings}
 
@@ -130,9 +181,6 @@ class HackerNewsScraper:
         return data
 
     def run(self) -> bool:
-        """
-        Perform incremental scraping and merge into history_file.
-        """
         temp_file = os.path.join(self.output_dir, '_hn_temp.json')
         scraped = self.scrape_new(temp_file)
 
@@ -168,9 +216,9 @@ class HackerNewsScraper:
             self.logger.info("No new articles to add.")
             return True
 
-        # Merge and sort by date (newest first)
+        # Merge and sort by published_date (newest first)
         combined = new_articles + existing
-        combined.sort(key=lambda x: x.get('date', ''), reverse=True)
+        combined.sort(key=lambda x: x.get('published_date', ''), reverse=True)
 
         save_to_json(combined, self.history_file)
         self.logger.info(f"Added {len(new_articles)} new articles; total now {len(combined)}.")

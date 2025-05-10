@@ -5,36 +5,205 @@ import time
 from datetime import datetime, timedelta
 import requests
 
-from utils.helpers import save_to_json
+from utils.helpers import save_to_json, load_from_json
 
-# NVD 2.0 API restricts date ranges to a maximum of 120 days per request
+
 def _chunk_ranges(start: datetime, end: datetime, max_days: int = 120):
     """
-    Yield (chunk_start, chunk_end) pairs covering [start..end]
-    without exceeding max_days in any interval.
+    Split date range into chunks not exceeding max_days.
+    
+    Args:
+        start: Start datetime
+        end: End datetime
+        max_days: Maximum days per chunk (NVD API limit is 120)
+    
+    Yields:
+        Tuple of (chunk_start, chunk_end) datetime pairs
     """
     delta = timedelta(days=max_days)
     chunk_start = start
     while chunk_start < end:
-        # subtract 1 millisecond so intervals butt up against each other
+        # Subtract 1 millisecond so intervals butt up against each other
         chunk_end = min(end, chunk_start + delta - timedelta(milliseconds=1))
         yield chunk_start, chunk_end
         chunk_start = chunk_end + timedelta(milliseconds=1)
 
+
+def load_cwe_database():
+    """
+    Load CWE database from JSON file.
+    
+    Returns:
+        Dictionary mapping CWE IDs to descriptions
+    """
+    try:
+        with open('cwe_database.json', 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print("CWE database not found. Using basic CWE information only.")
+        # Fallback to common CWEs if database file is missing
+        return {
+            "CWE-20": "Improper Input Validation",
+            "CWE-22": "Path Traversal",
+            "CWE-79": "Cross-site Scripting",
+            "CWE-89": "SQL Injection",
+            "NVD-CWE-Other": "Weakness not included in CWE list",
+            "NVD-CWE-noinfo": "Insufficient information to assign CWE"
+        }
+
+
+# Load CWE database once at module import
+CWE_DATABASE = load_cwe_database()
+
+
+def extract_cve_record(v: dict) -> dict:
+    """
+    Extract and transform a raw NVD vulnerability entry into a clean record.
+    
+    Args:
+        v: Raw vulnerability data from NVD API
+    
+    Returns:
+        Dictionary with cleaned CVE data in standardized format
+    """
+    # Extract core CVE data
+    c = v.get('cve', {})
+    
+    # Get metrics (located inside the 'cve' object)
+    metrics = c.get('metrics', {})
+    
+    # Initialize default values
+    cvss_score = None
+    severity = "Unknown"
+    
+    # Check all CVSS versions in order of preference (newest first)
+    cvss_versions = [
+        'cvssMetricV40',  # CVSS 4.0
+        'cvssMetricV31',  # CVSS 3.1
+        'cvssMetricV30',  # CVSS 3.0
+        'cvssMetricV2'    # CVSS 2.0
+    ]
+    
+    # Extract CVSS score and severity from the first available version
+    for metric_key in cvss_versions:
+        if metric_key in metrics:
+            metric_list = metrics[metric_key]
+            if isinstance(metric_list, list) and len(metric_list) > 0:
+                metric_data = metric_list[0]  # Use primary/NVD metric
+                
+                if 'cvssData' in metric_data:
+                    cvss_data = metric_data['cvssData']
+                    cvss_score = cvss_data.get('baseScore')
+                    
+                    # Severity location varies by CVSS version
+                    if metric_key in ['cvssMetricV30', 'cvssMetricV31', 'cvssMetricV40']:
+                        severity = cvss_data.get('baseSeverity', 'Unknown')
+                    else:  # CVSS v2
+                        severity = metric_data.get('baseSeverity', 'Unknown')
+                    
+                    if cvss_score is not None:
+                        break
+    
+    # Extract affected products from CPE configurations
+    products = []
+    for config in c.get('configurations', []):
+        for node in config.get('nodes', []):
+            for cpe_match in node.get('cpeMatch', []):
+                if cpe_match.get('vulnerable', False):
+                    cpe_parts = cpe_match.get('criteria', '').split(':')
+                    if len(cpe_parts) > 5:
+                        vendor = cpe_parts[3]
+                        product = cpe_parts[4]
+                        version = cpe_parts[5]
+                        
+                        # Format product name for readability
+                        product_name = product.replace('_', ' ').title()
+                        
+                        # Add version information if specific
+                        if version != '*' and version != '-':
+                            if 'versionEndIncluding' in cpe_match:
+                                version_end = cpe_match['versionEndIncluding']
+                                full_product = f"{product_name} (up to {version_end})"
+                            else:
+                                full_product = f"{product_name} {version}"
+                        else:
+                            full_product = product_name
+                        
+                        # Include vendor name if not redundant
+                        if vendor not in product.lower() and vendor != '*':
+                            vendor_name = vendor.replace('_', ' ').title()
+                            full_product = f"{vendor_name} {full_product}"
+                        
+                        products.append(full_product)
+    
+    # Extract English description
+    description = ""
+    for desc in c.get('descriptions', []):
+        if desc.get('lang') == 'en':
+            description = desc.get('value', '')
+            break
+    
+    # Extract CWE with human-readable description
+    cwe = "No CWE Identified"
+    if c.get('weaknesses') and len(c.get('weaknesses', [])) > 0:
+        weakness_entries = c['weaknesses'][0].get('description', [])
+        if weakness_entries and len(weakness_entries) > 0:
+            cwe_id = weakness_entries[0].get('value', 'Unknown')
+            
+            # Add description if available in our database
+            if cwe_id in CWE_DATABASE:
+                cwe = f"{cwe_id}: {CWE_DATABASE[cwe_id]}"
+            else:
+                cwe = cwe_id
+    
+    # Extract dates
+    published = c.get('published', '')
+    last_mod = c.get('lastModified', '')
+    
+    # Return cleaned record
+    return {
+        "source": "NVD",
+        "cve_id": c.get('id'),
+        "description": description,
+        "published_date": published[:10] if published else "",
+        "last_modified": last_mod[:10] if last_mod else "",
+        "severity": severity,
+        "cvss_score": cvss_score,
+        "cwe": cwe,
+        "products": list(set(products))  # Remove duplicates
+    }
+
+
 class NVDScraper:
-    """Fetch and maintain a master CVE history from NVD using API 2.0 with 120-day chunking."""
+    """
+    Scraper for fetching CVE data from the NVD API 2.0.
+    
+    Handles both full dataset downloads and incremental updates,
+    respecting API rate limits and date range restrictions.
+    """
+
     def __init__(self,
                  start_year: int = 2019,
-                 history_file: str = 'data/raw/nvd/nvd.json'):
+                 history_file: str = 'data/raw/nvd/nvd_cleaned.json'):
+        """
+        Initialize the NVD scraper.
+        
+        Args:
+            start_year: First year to fetch CVEs from
+            history_file: Path to store the cleaned CVE data
+        """
         self.output_dir = os.path.dirname(history_file)
         os.makedirs(self.output_dir, exist_ok=True)
+        
         self.logger = logging.getLogger(__name__)
         self.api_url = "https://services.nvd.nist.gov/rest/json/cves/2.0"
         self.history_path = history_file
         self.start_year = start_year
 
+        # Configure API key and rate limiting
         self.api_key = os.getenv('NVD_API_KEY')
         self.headers = {}
+        
         if self.api_key:
             self.headers['apiKey'] = self.api_key
             self.rate_limit_delay = 0.6  # 50 requests per 30 seconds
@@ -44,196 +213,176 @@ class NVDScraper:
 
     def fetch_all_cves(self) -> bool:
         """
-        Full fetch: iterate each year from start_year to today,
-        split into <=120-day chunks, and aggregate all CVEs.
+        Fetch all CVEs from start_year to present.
+        
+        Returns:
+            bool: True if successful, False otherwise
         """
         self.logger.info(f"Fetching all CVEs from {self.start_year} to today via API 2.0")
-        cve_dict: dict[str, dict] = {}
+        raw_dict = {}
         current_year = datetime.utcnow().year
 
+        # Fetch data year by year
         for year in range(self.start_year, current_year + 1):
             year_start = datetime(year, 1, 1)
             year_end = datetime.utcnow() if year == current_year else datetime(year, 12, 31, 23, 59, 59, 999000)
 
+            # Split year into 120-day chunks (API limit)
             for chunk_start, chunk_end in _chunk_ranges(year_start, year_end):
                 s = chunk_start.strftime("%Y-%m-%dT%H:%M:%S.000")
                 e = chunk_end.strftime("%Y-%m-%dT%H:%M:%S.000")
+                
                 params = {
                     'pubStartDate': s,
-                    'pubEndDate':   e,
+                    'pubEndDate': e,
                     'resultsPerPage': 2000
                 }
+                
                 self.logger.info(f"Fetching CVEs for {s} -> {e}")
 
+                # Fetch initial batch
                 response = requests.get(self.api_url, headers=self.headers, params=params)
                 response.raise_for_status()
                 data = response.json()
                 total = data.get('totalResults', 0)
+                
                 if total == 0:
                     continue
 
-                self._process_batch(data, cve_dict)
+                # Process first batch
+                for v in data.get('vulnerabilities', []):
+                    cid = v.get('cve', {}).get('id')
+                    if cid:
+                        raw_dict[cid] = v
+
+                # Fetch remaining pages if necessary
                 idx = len(data.get('vulnerabilities', []))
                 while idx < total:
                     params['startIndex'] = idx
                     batch_resp = requests.get(self.api_url, headers=self.headers, params=params)
                     batch_resp.raise_for_status()
                     batch = batch_resp.json()
-                    self._process_batch(batch, cve_dict)
+                    
+                    for v in batch.get('vulnerabilities', []):
+                        cid = v.get('cve', {}).get('id')
+                        if cid:
+                            raw_dict[cid] = v
+                    
                     idx += len(batch.get('vulnerabilities', []))
                     time.sleep(self.rate_limit_delay)
 
-            self.logger.info(f"Year {year} complete: Total CVEs so far: {len(cve_dict)}")
+            self.logger.info(f"Year {year} complete: Total CVEs so far: {len(raw_dict)}")
 
-        if not cve_dict:
+        if not raw_dict:
             self.logger.error("No CVEs were found or processed!")
             return False
 
-        history = {
-            'generated': datetime.utcnow().isoformat(),
-            'total_cves': len(cve_dict),
-            'format': 'NVD_CVE',
-            'version': '2.0',
-            'vulnerabilities': list(cve_dict.values())
-        }
-        save_to_json(history, self.history_path)
-        self.logger.info(f"Fetch complete: {len(cve_dict)} unique CVEs -> {self.history_path}")
+        # Transform and save cleaned records
+        cleaned = [extract_cve_record(v) for v in raw_dict.values()]
+        save_to_json(cleaned, self.history_path)
+        self.logger.info(f"Fetch complete: {len(cleaned)} CVE records -> {self.history_path}")
         return True
 
     def incremental_update(self) -> bool:
         """
-        Incremental: load existing history, then fetch only new or modified CVEs
-        since the latest timestamps, using <=120-day chunking if needed.
+        Update existing dataset with new and modified CVEs.
+        
+        Returns:
+            bool: True if successful, False otherwise
         """
+        # Load existing data
         try:
-            with open(self.history_path, 'r', encoding='utf-8') as f:
-                history = json.load(f)
+            existing = load_from_json(self.history_path)
+            if not isinstance(existing, list):
+                self.logger.warning("Existing history is not a list; resetting.")
+                existing = []
         except (json.JSONDecodeError, FileNotFoundError) as e:
             self.logger.error(f"Error loading history file: {e}")
             self.logger.info("Starting fresh fetch")
             return self.fetch_all_cves()
 
-        existing_cves = {
-            v['cve']['id']: v
-            for v in history.get('vulnerabilities', [])
-            if v.get('cve', {}).get('id')
-        }
-        if not existing_cves:
-            self.logger.error("No valid CVEs found in history file")
-            return self.fetch_all_cves()
+        # Map existing records by CVE ID
+        existing_map = {rec['cve_id']: rec for rec in existing}
 
-        # Determine latest published/modified datetimes
-        latest_pub = datetime(2000,1,1)
-        latest_mod = datetime(2000,1,1)
-        for v in existing_cves.values():
-            c = v['cve']
-            try:
-                p = datetime.fromisoformat(c.get('published','').rstrip('Z'))
-                latest_pub = max(latest_pub, p)
-            except: pass
-            try:
-                m = datetime.fromisoformat(c.get('lastModified','').rstrip('Z'))
-                latest_mod = max(latest_mod, m)
-            except: pass
+        # Find latest dates in existing data
+        latest_pub = max(
+            (datetime.fromisoformat(rec['published_date']) for rec in existing),
+            default=datetime(2000, 1, 1)
+        )
+        latest_mod = max(
+            (datetime.fromisoformat(rec['last_modified']) for rec in existing),
+            default=datetime(2000, 1, 1)
+        )
 
         new_count = 0
         mod_count = 0
         now = datetime.utcnow()
 
-        # Fetch new publications
+        # Helper function to process API responses
+        def process_batch(batch):
+            nonlocal new_count, mod_count
+            for v in batch.get('vulnerabilities', []):
+                cid = v.get('cve', {}).get('id')
+                if not cid:
+                    continue
+                
+                record = extract_cve_record(v)
+                rec_pub = datetime.fromisoformat(record['published_date'])
+                rec_mod = datetime.fromisoformat(record['last_modified'])
+
+                if cid not in existing_map:
+                    # New CVE
+                    existing_map[cid] = record
+                    new_count += 1
+                elif rec_mod > datetime.fromisoformat(existing_map[cid]['last_modified']):
+                    # Updated CVE
+                    existing_map[cid] = record
+                    mod_count += 1
+
+        # Fetch newly published CVEs
         start_pub = latest_pub + timedelta(seconds=1)
         for cstart, cend in _chunk_ranges(start_pub, now):
-            self.logger.info(f"Checking for new CVEs published {cstart} -> {cend}")
-            params = {
-                'pubStartDate': cstart.strftime("%Y-%m-%dT%H:%M:%S.000"),
-                'pubEndDate':   cend.strftime("%Y-%m-%dT%H:%M:%S.000"),
-                'resultsPerPage': 2000
-            }
-            new_count += self._fetch_and_update(params, existing_cves)
+            s = cstart.strftime("%Y-%m-%dT%H:%M:%S.000")
+            e = cend.strftime("%Y-%m-%dT%H:%M:%S.000")
+            params = {'pubStartDate': s, 'pubEndDate': e, 'resultsPerPage': 2000}
+            
+            response = requests.get(self.api_url, headers=self.headers, params=params)
+            response.raise_for_status()
+            process_batch(response.json())
             time.sleep(self.rate_limit_delay)
 
-        # Fetch recent modifications
+        # Fetch recently modified CVEs
         start_mod = latest_mod + timedelta(seconds=1)
         for cstart, cend in _chunk_ranges(start_mod, now):
-            self.logger.info(f"Checking for CVEs modified {cstart} -> {cend}")
-            params = {
-                'lastModStartDate': cstart.strftime("%Y-%m-%dT%H:%M:%S.000"),
-                'lastModEndDate':   cend.strftime("%Y-%m-%dT%H:%M:%S.000"),
-                'resultsPerPage': 2000
-            }
-            mod_count += self._fetch_and_update(params, existing_cves, update_existing=True)
+            s = cstart.strftime("%Y-%m-%dT%H:%M:%S.000")
+            e = cend.strftime("%Y-%m-%dT%H:%M:%S.000")
+            params = {'lastModStartDate': s, 'lastModEndDate': e, 'resultsPerPage': 2000}
+            
+            response = requests.get(self.api_url, headers=self.headers, params=params)
+            response.raise_for_status()
+            process_batch(response.json())
             time.sleep(self.rate_limit_delay)
 
-        history = {
-            'generated': datetime.utcnow().isoformat(),
-            'total_cves': len(existing_cves),
-            'format': 'NVD_CVE',
-            'version': '2.0',
-            'vulnerabilities': list(existing_cves.values())
-        }
-        save_to_json(history, self.history_path)
+        # Save updated dataset
+        cleaned = list(existing_map.values())
+        save_to_json(cleaned, self.history_path)
         self.logger.info(f"Incremental update complete: {new_count} new, {mod_count} modified CVEs")
         return True
 
-    def _process_batch(self, data: dict, cve_dict: dict):
-        """Process a single page of API response, adding new CVEs to cve_dict."""
-        for v in data.get('vulnerabilities', []):
-            cid = v.get('cve', {}).get('id')
-            if cid:
-                cve_dict[cid] = v
-
-    def _fetch_and_update(self, params: dict, existing: dict, update_existing: bool=False) -> int:
-        """
-        Fetch one paginated date-chunk and update existing dict.
-        """
-        count = 0
-        try:
-            resp = requests.get(self.api_url, headers=self.headers, params=params)
-            resp.raise_for_status()
-            data = resp.json()
-            total = data.get('totalResults', 0)
-            if not total:
-                return 0
-            count += self._update_cves(data, existing, update_existing)
-            idx = len(data.get('vulnerabilities', []))
-            while idx < total:
-                params['startIndex'] = idx
-                batch_resp = requests.get(self.api_url, headers=self.headers, params=params)
-                batch_resp.raise_for_status()
-                batch = batch_resp.json()
-                processed = self._update_cves(batch, existing, update_existing)
-                count += processed
-                idx += len(batch.get('vulnerabilities', []))
-                self.logger.info(f"Progress: {idx}/{total}, +{processed}")
-                time.sleep(self.rate_limit_delay)
-        except Exception as e:
-            self.logger.error(f"Error fetching/updating CVEs chunk: {e}")
-        return count
-
-    def _update_cves(self, data: dict, existing: dict, update_existing: bool) -> int:
-        """Add new or update existing CVEs from one page of results."""
-        count = 0
-        for v in data.get('vulnerabilities', []):
-            cid = v.get('cve', {}).get('id')
-            if not cid:
-                continue
-            if cid not in existing:
-                existing[cid] = v
-                count += 1
-            elif update_existing:
-                old = existing[cid]['cve'].get('lastModified', '')
-                new = v['cve'].get('lastModified', '')
-                if new > old:
-                    existing[cid] = v
-                    count += 1
-        return count
-
     def run(self) -> bool:
-        """Entry point—full fetch if no history, else incremental update."""
+        """
+        Execute appropriate fetch strategy.
+        
+        Returns:
+            bool: True if successful, False otherwise
+        """
         try:
             if not os.path.isfile(self.history_path):
+                # No existing data - fetch everything
                 return self.fetch_all_cves()
-            return self.incremental_update()
+            else:
+                # Existing data - perform incremental update
+                return self.incremental_update()
         except Exception as e:
             self.logger.error(f"Run failed: {e}")
             return False

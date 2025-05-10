@@ -15,6 +15,7 @@ from anomaly_detection.detect_anomalies import AnomalyDetector
 from preprocessing.clean_text import TextPreprocessor
 from scraper.nvd_scraper import NVDScraper
 from scraper.hackernews_scraper import HackerNewsScraper
+from preprocessing.link_data_features import link_thn_to_nvd
 import argparse
 import subprocess
 import importlib
@@ -25,25 +26,24 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-# ────────────────────────────── bootstrap ───────────────────────────────
+# ───────────────── bootstrap ─────────────────
 ROOT = Path(__file__).resolve().parent
 sys.path.append(str(ROOT))
 
 
-# ─────────────────────────── pipeline pieces ────────────────────────────
+# ─────────────── pipeline pieces ───────────────
 
 def run_component(component_name: str, args) -> bool:
     """Run one pipeline component; return True on success."""
     log = logging.getLogger("run")
     log.info("Running component: %s", component_name)
 
-    # ──────────────── SCRAPE ────────────────────────────────────────────
+    # ─────────── SCRAPE ─────────────────────────────
     if component_name == "scrape":
 
-        # ── HackerNews ────────────────────────────────────────────────
+        # ── HackerNews ─────────────────────────────
         if args.source in ("all", "hackernews"):
             log.info("Scraping HackerNews")
-            # use HackerNewsScraper for full scrape + incremental merge
             hn_master = ROOT / "data/raw/hackernews/hackernews.json"
             hn_master.parent.mkdir(parents=True, exist_ok=True)
 
@@ -53,22 +53,32 @@ def run_component(component_name: str, args) -> bool:
                 return False
             log.info("HackerNews up-to-date")
 
-        # ── NVD ───────────────────────────────────────────────────────
+        # ── NVD ─────────────────────────────
         if args.source in ("all", "nvd"):
             log.info("Scraping NVD")
             nvd_hist = ROOT / "data/raw/nvd/nvd.json"
             nvd_hist.parent.mkdir(parents=True, exist_ok=True)
-            if not NVDScraper(start_year=2019, history_file=nvd_hist).run():
+            if not NVDScraper(start_year=2019, history_file=str(nvd_hist)).run():
                 log.error("NVD scrape failed")
                 return False
             log.info("NVD up-to-date")
 
-    # ─────────────── PREPROCESS ─────────────────────────────────────────
+    # ──────── PREPROCESS ──────────────────────
     elif component_name == "preprocess":
         TextPreprocessor().process_all_sources()
         log.info("Pre-processing completed")
 
-    # ───────────────── TRAIN ───────────────────────────────────────────
+    # ──────── LINK ──────────────────────
+    elif component_name == "link":
+        log.info("Linking THN articles to NVD CVEs")
+        try:
+            link_thn_to_nvd()
+        except Exception as e:
+            log.error("Linking failed: %s", e)
+            return False
+        log.info("Linking completed")
+
+    # ──────── TRAIN ──────────────────────
     elif component_name == "train":
         trainers = {
             "lr": "classification.train_severity_lr",
@@ -85,12 +95,12 @@ def run_component(component_name: str, args) -> bool:
             module.train()
         log.info("Model training completed")
 
-    # ─────────────── ANOMALY DETECTION ───────────────────────────────────
+    # ──────── ANOMALY DETECTION ──────────────────
     elif component_name == "detect_anomalies":
         AnomalyDetector().detect()
         log.info("Anomaly detection completed")
 
-    # ───────────────── DASHBOARD ────────────────────────────────────────
+    # ──────── DASHBOARD ─────────────────────
     elif component_name == "dashboard":
         dash = ROOT / "dashboard/app.py"
         if not dash.exists():
@@ -105,15 +115,14 @@ def run_component(component_name: str, args) -> bool:
 
     return True
 
-# ───────────────────── orchestration helpers ────────────────────────────
-
+# ──────── orchestration helpers ──────────────────────
 
 def run_all_components(args) -> bool:
-    """scrape -> preprocess -> train -> detect_anomalies (optional dash)."""
+    """scrape -> preprocess -> link -> train -> detect_anomalies (optional dash)."""
     log = logging.getLogger("run")
     log.info("Running full pipeline")
 
-    for comp in ("scrape", "preprocess", "train", "detect_anomalies"):
+    for comp in ("scrape", "preprocess", "link", "train", "detect_anomalies"):
         if not run_component(comp, args):
             log.error("Pipeline halted at '%s'", comp)
             return False
@@ -124,13 +133,12 @@ def run_all_components(args) -> bool:
     log.info("Pipeline finished successfully")
     return True
 
-# ─────────────────────────────── CLI ────────────────────────────────────
-
+# ────────────── CLI ────────────────────
 
 def main() -> int:
     p = argparse.ArgumentParser(description="Cyber‑Threat‑Intelligence CLI")
     p.add_argument("--component",
-                   choices=["scrape", "preprocess", "train",
+                   choices=["scrape", "preprocess", "link", "train",
                             "detect_anomalies", "dashboard", "all"],
                    default="all")
     p.add_argument("--source",
@@ -142,7 +150,6 @@ def main() -> int:
                    choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="INFO")
     args = p.parse_args()
 
-    # logging
     logs_dir = ROOT / "logs"
     logs_dir.mkdir(exist_ok=True)
     log_file = logs_dir / f"cti_{datetime.utcnow():%Y%m%d_%H%M%S}.log"
@@ -157,7 +164,6 @@ def main() -> int:
         args.component, args)
     return 0 if ok else 1
 
-
-# ─────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────
 if __name__ == "__main__":
     sys.exit(main())
