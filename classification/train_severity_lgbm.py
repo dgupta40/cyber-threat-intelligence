@@ -1,4 +1,6 @@
 """
+train_severity_lgbm.py
+
 Severity classifier - SBERT+LightGBM (balanced, oversampled)
 
 Outputs
@@ -66,12 +68,12 @@ def _train() -> None:
 
     metrics_path = METRICS_DIR / f"lgbm_report_{datetime.utcnow():%Y%m%d_%H%M}.json"
     metrics_path.write_text(json.dumps(report, indent=2))
-    print("saved metrics →", metrics_path)
+    print("saved metrics ->", metrics_path)
 
     # ── 6. save model ───────────────────────────────────────────────────────
     model_path = MODEL_DIR / f"severity_lgbm_{datetime.utcnow():%Y%m%d_%H%M}.pkl"
     joblib.dump({"model": clf, "label_encoder": le}, model_path)
-    print("saved model   →", model_path)
+    print("saved model   ->", model_path)
 
     # ── 7. predict full dataset & persist ───────────────────────────────────
     proba = clf.predict_proba(embeddings)
@@ -80,7 +82,7 @@ def _train() -> None:
 
     out_path = PROC_DIR / f"master_plus_pred_{datetime.utcnow():%Y%m%d_%H%M}.parquet"
     df.to_parquet(out_path, index=False)
-    print("wrote predictions →", out_path)
+    print("wrote predictions ->", out_path)
 
 def train():
     _train()

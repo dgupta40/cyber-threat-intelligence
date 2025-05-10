@@ -1,4 +1,6 @@
 """
+train_severity_lr.py
+
 Train baseline severity classifier
 Features : TF-IDF (sparse)
 Target   : severity_bin  (critical / high / medium / low)
@@ -55,13 +57,13 @@ def _train() -> None:
                                target_names=le.classes_, output_dict=True)
     m_path = METRICS_DIR / f"lr_report_{datetime.utcnow():%Y%m%d_%H%M}.json"
     with open(m_path,"w") as f: json.dump(report, f, indent=2)
-    print("saved metrics →", m_path)
+    print("saved metrics ->", m_path)
 
 # ── 6. save model ─────────────────────────────────────────────────────────────
     model_path = MODEL_DIR / f"severity_lr_{datetime.utcnow():%Y%m%d_%H%M}.pkl"
     joblib.dump({"model": clf, "label_encoder": le, "vectorizer": tfidf_obj["model"]},
             model_path)
-    print("saved model   →", model_path)
+    print("saved model   ->", model_path)
 
 # ── 7. predict full set & persist ─────────────────────────────────────────────
     proba = clf.predict_proba(X)
@@ -70,7 +72,7 @@ def _train() -> None:
 
     out_parquet = PROC_DIR / f"master_plus_pred_{datetime.utcnow():%Y%m%d_%H%M}.parquet"
     df.to_parquet(out_parquet, index=False)
-    print("wrote predictions →", out_parquet)
+    print("wrote predictions ->", out_parquet)
 
 def train():
     _train()

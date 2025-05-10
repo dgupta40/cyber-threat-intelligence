@@ -6,19 +6,13 @@ hackernews:
     - content
     - tags
     - cves
-nvd_v1_1:             # feeds with "CVE_Items"
-  keep:
-    - cve.CVE_data_meta.ID
-    - publishedDate
-    - lastModifiedDate
-    - cve.description.description_data
-    - impact.baseMetricV3.cvssV3
-    - impact.baseMetricV2.cvssV2
-nvd_jsonl:            # new feeds with "vulnerabilities"
+
+nvd_jsonl:
+  # Matches the v2.0 REST API under the top‑level "vulnerabilities" key
   keep:
     - cve.id
     - published
     - lastModified
-    - cve.descriptions
+    - cve.description.description_data
     - metrics.cvssMetricV31
-    - metrics.cvssMetricV2
+    - metrics.cvssMetricV30

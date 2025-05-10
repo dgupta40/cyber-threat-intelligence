@@ -2,191 +2,176 @@ import os
 import re
 import json
 import logging
+import hashlib
 from datetime import datetime
 
 import scrapy
 from scrapy.crawler import CrawlerProcess
-from bs4 import BeautifulSoup
 
-from utils.helpers import format_timestamp, safe_request
+from utils.helpers import save_to_json, load_from_json
+
 
 class HackerNewsSpider(scrapy.Spider):
     name = "hackernews_spider"
     start_urls = ['https://thehackernews.com/search/label/Vulnerability']
+    custom_settings = {
+        'RETRY_ENABLED': True,
+        'RETRY_TIMES': 3,
+        'DOWNLOAD_TIMEOUT': 15,
+        'LOG_LEVEL': 'ERROR',
+        'USER_AGENT': 'Mozilla/5.0 (compatible; HackerNewsBot/1.0)',
+    }
 
     def parse(self, response):
-        article_links = response.css('a.story-link::attr(href)').getall()
-        self.logger.info(f"Found {len(article_links)} article links on list page")
-        for link in article_links:
+        # Follow each article link
+        for link in response.css('a.story-link::attr(href)').getall():
             yield response.follow(link, callback=self.parse_article)
-
+        # Follow pagination until no next page
         next_page = response.css('a.blog-pager-older-link-mobile::attr(href)').get()
         if next_page:
             yield response.follow(next_page, callback=self.parse)
 
     def parse_article(self, response):
-        # 1. Title
+        # Archive raw HTML for future re-parsing
+        raw_dir = 'data/raw/hackernews/html'
+        os.makedirs(raw_dir, exist_ok=True)
+        url_hash = hashlib.sha256(response.url.encode()).hexdigest()
+        with open(os.path.join(raw_dir, f'{url_hash}.html'), 'w', encoding='utf-8') as f:
+            f.write(response.text)
+
+        # Timestamp when scraped
+        ingest_ts_thn = datetime.utcnow().isoformat()
+
+        # Parse publication date
+        date = None
+        date_text = response.xpath("//meta[@property='article:published_time']/@content").get() or ''
+        for pat in ('%Y-%m-%dT%H:%M:%SZ', '%B %d, %Y'):
+            try:
+                dt = datetime.strptime(date_text.strip(), pat)
+                date = dt.strftime('%Y-%m-%d')
+                break
+            except Exception:
+                continue
+        if not date:
+            m = re.search(r'([A-Za-z]+ \d{1,2},\s*\d{4})', response.text)
+            if m:
+                dt = datetime.strptime(m.group(1).strip(), '%B %d, %Y')
+                date = dt.strftime('%Y-%m-%d')
+        if not date:
+            self.logger.warning(f"Unparseable date on {response.url}")
+            date = datetime.utcnow().strftime('%Y-%m-%d')
+
+        # Title
         full_title = response.xpath('//title/text()').get(default='').strip()
         title = full_title.split('–')[0].strip()
 
-        # 2. Date
-        html = response.text
-        m = re.search(r'([A-Za-z]+ \d{1,2}, \s*\d{4})', html)
-        if m:
-            try:
-                dt = datetime.strptime(m.group(1).strip(), '%B %d, %Y')
-                date = dt.strftime('%Y-%m-%d')
-            except Exception:
-                date = format_timestamp()
-        else:
-            date = format_timestamp()
-
-        # 3. Content
+        # Content paragraphs
         paragraphs = response.css('div.articlebody p::text').getall()
-        content = " ".join(p.strip() for p in paragraphs if p.strip())
+        body = " ".join(p.strip() for p in paragraphs if p.strip())
 
-        # 4. CVEs
-        cves = re.findall(r'CVE-\d{4}-\d{4,6}', content)
+        # Prepend title to content for richer text field
+        text = f"{title}. {body}"
 
-        # 5. Patched versions
-        patched_versions = []
-        for ul in response.css('div.articlebody ul'):
-            txt = " ".join(ul.css('li::text').getall())
-            if any(os in txt for os in ['iOS', 'macOS', 'tvOS', 'visionOS']):
-                patched_versions = [li.strip() for li in ul.css('li::text').getall()]
+        # Extract CVE IDs, normalized
+        raw_cves = re.findall(r'(CVE-\d{4}-\d{4,6})', body, flags=re.IGNORECASE)
+        cves = [cve.upper() for cve in raw_cves]
 
-        # 6. YouTube embeds
-        videos = response.css('div.articlebody iframe::attr(src)').re(r'.*youtube\.com.*')
-
-        # 7. Tags
+        # Extract tags
         tags = response.css('span.categ a span::text').getall()
 
         yield {
-            'source': 'thehackernews',
-            'title': title,
-            'content': content,
-            'date': date,
+            'source': 'The Hacker News',
+            'text': text,
+            'published_date': date,
             'tags': tags,
             'url': response.url,
             'cves': cves,
-            'patched_versions': patched_versions,
-            'videos': videos
+            'ingest_ts_thn': ingest_ts_thn
         }
 
 
 class HackerNewsScraper:
-    def __init__(self, method="scrapy"):
-        self.output_dir = 'data/raw/hackernews'
+    """Scraper with incremental update for TheHackerNews vulnerability label using Scrapy."""
+
+    REQUIRED_KEYS = {
+        'source', 'title', 'content',
+        'date', 'tags', 'url',
+        'cves', 'ingest_ts_thn'
+    }
+
+    def __init__(self, history_file: str = 'data/raw/hackernews/hackernews.json'):
+        self.output_dir = os.path.dirname(history_file)
         os.makedirs(self.output_dir, exist_ok=True)
+        self.history_file = history_file
         self.logger = logging.getLogger(__name__)
-        self.method = method
 
-    def scrape_new(self, output_file):
+    def scrape_new(self, temp_file: str) -> list[dict]:
         """
-        Scrape into `output_file`, return list of all scraped items.
+        Run Scrapy spider and dump JSON feed to temp_file (fresh each time).
         """
-        if self.method == "bs4":
-            articles = self._scrape_with_requests()
-            # write them out so main.py can load the same file
-            with open(output_file, 'w', encoding='utf-8') as f:
-                json.dump(articles, f, indent=2, ensure_ascii=False)
-            return articles
-        else:
-            # Scrapy path
-            self._scrape_with_scrapy(output_file)
-            with open(output_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
+        # Remove leftover temp file to ensure clean overwrite
+        if os.path.exists(temp_file):
+            try:
+                os.remove(temp_file)
+            except OSError as e:
+                self.logger.warning(f"Could not remove existing temp file {temp_file}: {e}")
 
-    def _scrape_with_scrapy(self, output_file):
-        """
-        Run the Scrapy spider and dump a JSON feed to `output_file`.
-        """
-        process = CrawlerProcess(settings={
-            'FEEDS': {
-                output_file: {'format': 'json'},
-            },
-            'LOG_LEVEL': 'ERROR',
-            'USER_AGENT': 'Mozilla/5.0 (compatible; HackerNewsBot/1.0)'
-        })
+        # Tell Scrapy to overwrite the feed file
+        feed_opts = {'format': 'json', 'overwrite': True}
+        settings = {'FEEDS': {temp_file: feed_opts}, **HackerNewsSpider.custom_settings}
+
+        process = CrawlerProcess(settings=settings)
         process.crawl(HackerNewsSpider)
         process.start()
 
-    def _scrape_with_requests(self):
-        """
-        Pull pages via requests/BS4, return list of article dicts.
-        """
-        from utils.helpers import format_timestamp  # in case it got overwritten
-        base_url = 'https://thehackernews.com/search/label/Vulnerability'
-        articles = []
-        page_url = base_url
+        # Load the freshly written JSON array
+        with open(temp_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data
 
-        for _ in range(5):
-            resp = safe_request(page_url)
-            if not resp:
-                break
-            soup = BeautifulSoup(resp.text, 'html.parser')
-            links = [a['href'] for a in soup.select('a.story-link')]
-            for link in links:
-                art = self._parse_article_with_bs4(link)
-                if art:
-                    articles.append(art)
-            np = soup.select_one('a.blog-pager-older-link-mobile')
-            if np:
-                page_url = np['href']
+    def run(self) -> bool:
+        """
+        Perform incremental scraping and merge into history_file.
+        """
+        temp_file = os.path.join(self.output_dir, '_hn_temp.json')
+        scraped = self.scrape_new(temp_file)
+
+        try:
+            os.remove(temp_file)
+        except OSError:
+            pass
+
+        # Validate scraped items
+        valid = []
+        for art in scraped:
+            missing = self.REQUIRED_KEYS - set(art.keys())
+            if missing:
+                self.logger.error(f"Article missing fields {missing}: {art.get('url')}")
             else:
-                break
+                valid.append(art)
 
-        return articles
+        # Load existing history
+        try:
+            existing = load_from_json(self.history_file)
+            if not isinstance(existing, list):
+                self.logger.warning("Existing history is not a list; resetting.")
+                existing = []
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            self.logger.warning(f"Could not load history ({e}); starting fresh.")
+            existing = []
 
-    def _parse_article_with_bs4(self, url):
-        resp = safe_request(url)
-        if not resp:
-            return None
-        soup = BeautifulSoup(resp.text, 'html.parser')
+        # Deduplicate by URL
+        existing_urls = {a['url'] for a in existing}
+        new_articles = [a for a in valid if a['url'] not in existing_urls]
 
-        # Title
-        title_tag = soup.find('title')
-        title = title_tag.text.split('–')[0].strip() if title_tag else ''
+        if not new_articles:
+            self.logger.info("No new articles to add.")
+            return True
 
-        # Date
-        m = re.search(r'([A-Za-z]+ \d{1,2}, \s*\d{4})', resp.text)
-        if m:
-            try:
-                dt = datetime.strptime(m.group(1).strip(), '%B %d, %Y')
-                date = dt.strftime('%Y-%m-%d')
-            except:
-                date = format_timestamp()
-        else:
-            date = format_timestamp()
+        # Merge and sort by date (newest first)
+        combined = new_articles + existing
+        combined.sort(key=lambda x: x.get('date', ''), reverse=True)
 
-        # Content
-        paras = soup.select('div.articlebody p')
-        content = " ".join(p.get_text(strip=True) for p in paras)
-
-        # CVEs
-        cves = re.findall(r'CVE-\d{4}-\d{4,6}', content)
-
-        # Patched versions
-        patched = []
-        for ul in soup.select('div.articlebody ul'):
-            txt = ul.get_text()
-            if any(os in txt for os in ['iOS', 'macOS', 'tvOS', 'visionOS']):
-                patched = [li.get_text(strip=True) for li in ul.select('li')]
-
-        # Videos
-        videos = [ifr['src'] for ifr in soup.select('div.articlebody iframe[src*="youtube.com"]')]
-
-        # Tags
-        tags = [t.get_text(strip=True) for t in soup.select('span.categ a span')]
-
-        return {
-            'source': 'thehackernews',
-            'title': title,
-            'content': content,
-            'date': date,
-            'tags': tags,
-            'url': url,
-            'cves': cves,
-            'patched_versions': patched,
-            'videos': videos
-        }
+        save_to_json(combined, self.history_file)
+        self.logger.info(f"Added {len(new_articles)} new articles; total now {len(combined)}.")
+        return True
