@@ -4,12 +4,12 @@ clean_text.py — Pre-process raw scraped data for modelling.
 
 Pipeline:
 1. Load flat JSON files from NVD + THN.
-2. Clean & tokenize text (THN).
+2. Clean & tokenize text (THN & NVD).
 3. Extract CVEs (or use from THN directly).
 4. Generate embeddings: TF-IDF, Word2Vec, SBERT.
 5. Compute sentiment.
 6. Add temporal features.
-7. Save master_<timestamp>.parquet.
+7. Save master_<timestamp>.parquet and .csv.
 """
 
 from __future__ import annotations
@@ -142,7 +142,8 @@ def main() -> str:
     df_nvd['cvssScore'] = pd.to_numeric(df_nvd.get('cvss_score'), errors='coerce')
     df_nvd['severity_bin'] = df_nvd['cvssScore'].apply(_cvss_bin)
     df_nvd['description'] = df_nvd.get('description', '')
-    df_nvd['tokens'] = df_nvd['description'].fillna('').apply(_tokenise)
+    df_nvd['clean_text'] = df_nvd['description'].fillna('').map(_clean_html)
+    df_nvd['tokens'] = df_nvd['clean_text'].apply(_tokenise)
     df_nvd['sbert_path'] = ''
     df_nvd['sentiment'] = np.nan
     df_nvd['mentioned_cves'] = df_nvd['cve_id'].apply(lambda x: [x] if pd.notna(x) else [])
@@ -173,10 +174,18 @@ def main() -> str:
     df_thn = _add_temporal_features(df_thn.rename(columns={"published_date": "published"}))
 
     df_master = pd.concat([df_nvd, df_thn]).sort_index()
-    out = PROC_DIR / f"master_{datetime.utcnow():%Y%m%d_%H%M}.parquet"
-    df_master.to_parquet(out, index=False)
-    logging.info(f"Saved master -> {out}")
-    return str(out)
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M")
+    out_parquet = PROC_DIR / f"master_{timestamp}.parquet"
+    out_csv = PROC_DIR / f"master_{timestamp}.csv"
+    df_master.to_parquet(out_parquet, index=False)
+    df_master.to_csv(out_csv, index=False)
+    logging.info(f"Saved master -> {out_parquet}\n CSV version saved -> {out_csv}")
+
+    # export THN and NVD separately
+    df_thn.to_csv(PROC_DIR / f"thn_cleaned_{timestamp}.csv", index=False)
+    df_nvd.to_csv(PROC_DIR / f"nvd_cleaned_{timestamp}.csv", index=False)
+
+    return str(out_parquet)
 
 class TextPreprocessor:
     def run(self): return main()
