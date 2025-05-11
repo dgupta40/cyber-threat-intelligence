@@ -90,7 +90,7 @@ def main():
     if len(sys.argv) > 1:
         file_path = sys.argv[1]
     else:
-        file_path = "data/processed/master_plus_pred_20250507_1807.parquet"
+        file_path = "data/processed/test_master.parquet"
     
     view_parquet(file_path)
 
