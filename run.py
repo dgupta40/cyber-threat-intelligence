@@ -15,7 +15,7 @@ from anomaly_detection.detect_anomalies import AnomalyDetector
 from preprocessing.clean_text import TextPreprocessor
 from scraper.nvd_scraper import NVDScraper
 from scraper.hackernews_scraper import HackerNewsScraper
-from preprocessing.link_data_features import link_thn_to_nvd
+from preprocessing.link_thn_to_nvd import link_thn_to_nvd
 import argparse
 import subprocess
 import importlib

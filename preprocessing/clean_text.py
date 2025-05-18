@@ -147,7 +147,7 @@ def _tokenise(txt: str) -> List[str]:
     return [lemmatizer.lemmatize(t) for t in tokens if t not in STOPWORDS]
 
 
-def _cvss_bin(score) -> str:
+def _cvss_bin(score) -> str:   ### Literature for this
     """Categorize CVSS scores into severity levels"""
     try:
         s = float(score)
