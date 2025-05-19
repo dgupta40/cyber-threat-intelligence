@@ -5,165 +5,135 @@ CLI entry-point for the AI-Driven Cyber-Threat-Intelligence system.
 Run individual stages, or the full pipeline:
 
     python run.py --component scrape
-    python run.py --component train  --model lgbm
-    python run.py --component all    --model all   --dashboard
+    python run.py --component preprocess
+    python run.py --component categorize
+    python run.py --component urgency
+    python run.py --component detect_anomalies
+    python run.py --component all --dashboard
 """
 
-from __future__ import annotations
+import sys
+import subprocess
+import logging
+from pathlib import Path
+from datetime import datetime
+import argparse
+
 from utils.helpers import load_env
-from anomaly_detection.detect_anomalies import AnomalyDetector
-from preprocessing.clean_text import TextPreprocessor
 from scraper.nvd_scraper import NVDScraper
 from scraper.hackernews_scraper import HackerNewsScraper
-from preprocessing.link_thn_to_nvd import link_thn_to_nvd
-import argparse
-import subprocess
-import importlib
-import json
-import logging
-import os
-import sys
-from datetime import datetime
-from pathlib import Path
-
-# ───────────────── bootstrap ─────────────────
+from preprocessing.clean_text import main as preprocess_main
+import pipeline.threat_classifier as threat_classifier
+from pipeline.urgency_scoring import main as urgency_main
+from pipeline.anomaly_detection import main as urgency_main
+# ──────────────────────────────────────────────────────────────────────────────
 ROOT = Path(__file__).resolve().parent
 sys.path.append(str(ROOT))
+LOGS_DIR = ROOT / "logs"
 
 
-# ─────────────── pipeline pieces ───────────────
-
-def run_component(component_name: str, args) -> bool:
-    """Run one pipeline component; return True on success."""
+def run_component(name: str, args) -> bool:
     log = logging.getLogger("run")
-    log.info("Running component: %s", component_name)
+    log.info(f"▶ Running component: {name}")
 
-    # ─────────── SCRAPE ─────────────────────────────
-    if component_name == "scrape":
-
-        # ── HackerNews ─────────────────────────────
+    if name == "scrape":
         if args.source in ("all", "hackernews"):
-            log.info("Scraping HackerNews")
-            hn_master = ROOT / "data/raw/hackernews/hackernews.json"
-            hn_master.parent.mkdir(parents=True, exist_ok=True)
-
-            scraper = HackerNewsScraper(history_file=str(hn_master))
-            if not scraper.run():
-                log.error("HackerNews scraper failed")
+            log.info("  • HackerNews")
+            out = ROOT / "data/raw/hackernews/hackernews.json"
+            out.parent.mkdir(parents=True, exist_ok=True)
+            if not HackerNewsScraper(history_file=str(out)).run():
+                log.error("    ✖ HackerNews failed")
                 return False
-            log.info("HackerNews up-to-date")
-
-        # ── NVD ─────────────────────────────
         if args.source in ("all", "nvd"):
-            log.info("Scraping NVD")
-            nvd_hist = ROOT / "data/raw/nvd/nvd.json"
-            nvd_hist.parent.mkdir(parents=True, exist_ok=True)
-            if not NVDScraper(start_year=2019, history_file=str(nvd_hist)).run():
-                log.error("NVD scrape failed")
+            log.info("  • NVD")
+            out = ROOT / "data/raw/nvd/nvd.json"
+            out.parent.mkdir(parents=True, exist_ok=True)
+            if not NVDScraper(start_year=2019, history_file=str(out)).run():
+                log.error("    ✖ NVD failed")
                 return False
-            log.info("NVD up-to-date")
 
-    # ──────── PREPROCESS ──────────────────────
-    elif component_name == "preprocess":
-        TextPreprocessor().process_all_sources()
-        log.info("Pre-processing completed")
-
-    # ──────── LINK ──────────────────────
-    elif component_name == "link":
-        log.info("Linking THN articles to NVD CVEs")
+    elif name == "preprocess":
+        log.info("  • Preprocessing & linking")
         try:
-            link_thn_to_nvd()
-        except Exception as e:
-            log.error("Linking failed: %s", e)
+            preprocess_main()
+        except Exception:
+            log.exception("    ✖ Preprocessing failed")
             return False
-        log.info("Linking completed")
 
-    # ──────── TRAIN ──────────────────────
-    elif component_name == "train":
-        trainers = {
-            "lr": "classification.train_severity_lr",
-            "lgbm": "classification.train_severity_lgbm",
-        }
-        selected = trainers if args.model == "all" else {
-            args.model: trainers[args.model]}
-        for key, module_path in selected.items():
-            log.info("Training model [%s]", key)
-            module = importlib.import_module(module_path)
-            if not hasattr(module, "train"):
-                log.error("%s has no train() function", module_path)
-                return False
-            module.train()
-        log.info("Model training completed")
+    elif name == "categorize":
+        log.info("  • Threat categorization")
+        try:
+            threat_classifier.main()
+        except Exception:
+            log.exception("    ✖ Categorization failed")
+            return False
 
-    # ──────── ANOMALY DETECTION ──────────────────
-    elif component_name == "detect_anomalies":
-        AnomalyDetector().detect()
-        log.info("Anomaly detection completed")
+    elif name == "urgency":
+        log.info("  • Urgency scoring")
+        try:
+            urgency_main()
+        except Exception:
+            log.exception("    ✖ Urgency assessment failed")
+            return False
 
-    # ──────── DASHBOARD ─────────────────────
-    elif component_name == "dashboard":
+    elif name == "detect_anomalies":
+        log.info("  • Emerging-threat detection")
+        try:
+            ed = urgency_main()
+        except Exception:
+            log.exception("    ✖ Emerging threat detection failed")
+            return False
+
+    elif name == "dashboard":
         dash = ROOT / "dashboard/app.py"
         if not dash.exists():
-            log.error("dashboard/app.py not found")
+            log.error("    ✖ Dashboard not found")
             return False
         subprocess.Popen([sys.executable, "-m", "streamlit", "run", str(dash)])
-        log.info("Dashboard started -> http://localhost:8501")
+        log.info("    • Dashboard running at http://localhost:8501")
 
     else:
-        log.error("Unknown component: %s", component_name)
+        log.error(f"Unknown component '{name}'")
         return False
 
+    log.info(f"✔ {name} completed")
     return True
 
-# ──────── orchestration helpers ──────────────────────
 
-def run_all_components(args) -> bool:
-    """scrape -> preprocess -> link -> train -> detect_anomalies (optional dash)."""
-    log = logging.getLogger("run")
-    log.info("Running full pipeline")
-
-    for comp in ("scrape", "preprocess", "link", "train", "detect_anomalies"):
+def run_all(args) -> bool:
+    for comp in ("scrape", "preprocess", "categorize", "urgency", "detect_anomalies"):
         if not run_component(comp, args):
-            log.error("Pipeline halted at '%s'", comp)
+            logging.getLogger("run").error(f"Pipeline halted at '{comp}'")
             return False
-
     if args.dashboard:
         run_component("dashboard", args)
-
-    log.info("Pipeline finished successfully")
     return True
 
-# ────────────── CLI ────────────────────
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="Cyber‑Threat‑Intelligence CLI")
-    p.add_argument("--component",
-                   choices=["scrape", "preprocess", "link", "train",
-                            "detect_anomalies", "dashboard", "all"],
-                   default="all")
-    p.add_argument("--source",
-                   choices=["hackernews", "nvd", "all"], default="all")
-    p.add_argument("--model",
-                   choices=["lr", "lgbm", "all"], default="all")
+    p = argparse.ArgumentParser(description="Cyber-Threat-Intelligence CLI")
+    p.add_argument(
+        "--component",
+        choices=["scrape","preprocess","categorize","urgency","detect_anomalies","dashboard","all"],
+        default="all"
+    )
+    p.add_argument("--source", choices=["hackernews","nvd","all"], default="all")
     p.add_argument("--dashboard", action="store_true")
-    p.add_argument("--log-level",
-                   choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="INFO")
+    p.add_argument("--log-level", choices=["DEBUG","INFO","WARNING","ERROR"], default="INFO")
     args = p.parse_args()
 
-    logs_dir = ROOT / "logs"
-    logs_dir.mkdir(exist_ok=True)
-    log_file = logs_dir / f"cti_{datetime.utcnow():%Y%m%d_%H%M%S}.log"
+    LOGS_DIR.mkdir(exist_ok=True)
+    logfile = LOGS_DIR / f"cti_{datetime.utcnow():%Y%m%d_%H%M%S}.log"
     logging.basicConfig(
         level=getattr(logging, args.log_level),
         format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
-        handlers=[logging.FileHandler(log_file), logging.StreamHandler()])
+        handlers=[logging.FileHandler(logfile), logging.StreamHandler()]
+    )
     logging.getLogger("urllib3").setLevel(logging.WARNING)
 
     load_env()
-    ok = run_all_components(args) if args.component == "all" else run_component(
-        args.component, args)
+    ok = run_all(args) if args.component == "all" else run_component(args.component, args)
     return 0 if ok else 1
 
-# ─────────────────────────────────────────────────────
 if __name__ == "__main__":
     sys.exit(main())
