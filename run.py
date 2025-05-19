@@ -25,7 +25,7 @@ from scraper.hackernews_scraper import HackerNewsScraper
 from preprocessing.clean_text import main as preprocess_main
 import pipeline.threat_classifier as threat_classifier
 from pipeline.urgency_scoring import main as urgency_main
-from pipeline.anomaly_detection import main as urgency_main
+from pipeline.anomaly_detection import main as anomaly_main
 # ──────────────────────────────────────────────────────────────────────────────
 ROOT = Path(__file__).resolve().parent
 sys.path.append(str(ROOT))
@@ -38,26 +38,26 @@ def run_component(name: str, args) -> bool:
 
     if name == "scrape":
         if args.source in ("all", "hackernews"):
-            log.info("  • HackerNews")
+            log.info("  HackerNews")
             out = ROOT / "data/raw/hackernews/hackernews.json"
             out.parent.mkdir(parents=True, exist_ok=True)
             if not HackerNewsScraper(history_file=str(out)).run():
-                log.error("    ✖ HackerNews failed")
+                log.error("   HackerNews failed")
                 return False
         if args.source in ("all", "nvd"):
-            log.info("  • NVD")
+            log.info("   NVD")
             out = ROOT / "data/raw/nvd/nvd.json"
             out.parent.mkdir(parents=True, exist_ok=True)
             if not NVDScraper(start_year=2019, history_file=str(out)).run():
-                log.error("    ✖ NVD failed")
+                log.error("     NVD failed")
                 return False
 
     elif name == "preprocess":
-        log.info("  • Preprocessing & linking")
+        log.info("   Preprocessing & linking")
         try:
             preprocess_main()
         except Exception:
-            log.exception("    ✖ Preprocessing failed")
+            log.exception("     Preprocessing failed")
             return False
 
     elif name == "categorize":
@@ -65,7 +65,7 @@ def run_component(name: str, args) -> bool:
         try:
             threat_classifier.main()
         except Exception:
-            log.exception("    ✖ Categorization failed")
+            log.exception("     Categorization failed")
             return False
 
     elif name == "urgency":
@@ -73,24 +73,24 @@ def run_component(name: str, args) -> bool:
         try:
             urgency_main()
         except Exception:
-            log.exception("    ✖ Urgency assessment failed")
+            log.exception("     Urgency assessment failed")
             return False
 
     elif name == "detect_anomalies":
         log.info("  • Emerging-threat detection")
         try:
-            ed = urgency_main()
+            ed = anomaly_main()
         except Exception:
-            log.exception("    ✖ Emerging threat detection failed")
+            log.exception("    Emerging threat detection failed")
             return False
 
     elif name == "dashboard":
         dash = ROOT / "dashboard/app.py"
         if not dash.exists():
-            log.error("    ✖ Dashboard not found")
+            log.error("     Dashboard not found")
             return False
         subprocess.Popen([sys.executable, "-m", "streamlit", "run", str(dash)])
-        log.info("    • Dashboard running at http://localhost:8501")
+        log.info("     Dashboard running at http://localhost:8501")
 
     else:
         log.error(f"Unknown component '{name}'")

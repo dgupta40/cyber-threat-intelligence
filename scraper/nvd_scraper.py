@@ -150,7 +150,7 @@ def extract_cve_record(v: dict) -> dict:
         if weakness_entries and len(weakness_entries) > 0:
             cwe_id = weakness_entries[0].get('value', 'Unknown')
             
-            # Add description if available in our database
+            # Add description if available in  database
             if cwe_id in CWE_DATABASE:
                 cwe = f"{cwe_id}: {CWE_DATABASE[cwe_id]}"
             else:

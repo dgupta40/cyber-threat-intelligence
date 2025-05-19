@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CTI preprocessing & THN→NVD linking (cleaned + SBERT always, 2025-05-18).
+CTI preprocessing & THN→NVD linking
 – HTML → text
 – Cyber normalization → generic cleaning
 – Stop‑word removal & lemmatization
@@ -9,7 +9,7 @@ CTI preprocessing & THN→NVD linking (cleaned + SBERT always, 2025-05-18).
 – Sentiment (batch, cardiffnlp/twitter-roberta-base-sentiment)
 – TF‑IDF on THN (min_df=3, max_df=0.8)
 – SBERT embeddings (all-MiniLM-L6-v2)
-– Integrated CVE→article linking (n_articles, linked_articles, earliest_article_date)
+– Integrated CVE->article linking (n_articles, linked_articles, earliest_article_date)
 Outputs: data/processed/master.parquet and master.csv
 """
 
@@ -31,9 +31,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from tqdm.auto import tqdm
 from transformers import pipeline
 
-# ──────────────────────────────────────────────────────────────────────────────
 # CONFIGURATION
-# ──────────────────────────────────────────────────────────────────────────────
 
 RAW_DIR   = Path("data/raw")
 PROC_DIR  = Path("data/processed"); PROC_DIR.mkdir(parents=True, exist_ok=True)
@@ -56,9 +54,7 @@ ATTACK_MAP = {
     r"\b(cross[- ]?site[- ]?request[- ]?forgery|csrf)\b":"CSRF",
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
 # HELPERS
-# ──────────────────────────────────────────────────────────────────────────────
 
 def clean_html(html: str) -> str:
     """Strip HTML tags and collapse whitespace."""
@@ -125,9 +121,7 @@ def load_raw() -> pd.DataFrame:
             continue
     return pd.DataFrame(recs)
 
-# ──────────────────────────────────────────────────────────────────────────────
 # MAIN
-# ──────────────────────────────────────────────────────────────────────────────
 
 def main():
     logging.basicConfig(level=logging.WARNING, format="%(asctime)s | %(levelname)s | %(message)s")
