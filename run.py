@@ -19,7 +19,7 @@ from pathlib import Path
 from datetime import datetime
 import argparse
 
-from utils.helpers import load_env
+from dotenv import load_dotenv
 from scraper.nvd_scraper import NVDScraper
 from scraper.hackernews_scraper import HackerNewsScraper
 from preprocessing.clean_text import main as preprocess_main
@@ -34,7 +34,7 @@ LOGS_DIR = ROOT / "logs"
 
 def run_component(name: str, args) -> bool:
     log = logging.getLogger("run")
-    log.info(f"▶ Running component: {name}")
+    log.info(f" Running component: {name}")
 
     if name == "scrape":
         if args.source in ("all", "hackernews"):
@@ -69,7 +69,7 @@ def run_component(name: str, args) -> bool:
             return False
 
     elif name == "urgency":
-        log.info("  • Urgency scoring")
+        log.info("   Urgency scoring")
         try:
             urgency_main()
         except Exception:
@@ -77,7 +77,7 @@ def run_component(name: str, args) -> bool:
             return False
 
     elif name == "detect_anomalies":
-        log.info("  • Emerging-threat detection")
+        log.info("   Emerging-threat detection")
         try:
             ed = anomaly_main()
         except Exception:
@@ -96,7 +96,7 @@ def run_component(name: str, args) -> bool:
         log.error(f"Unknown component '{name}'")
         return False
 
-    log.info(f"✔ {name} completed")
+    log.info(f" {name} completed")
     return True
 
 
@@ -131,7 +131,7 @@ def main() -> int:
     )
     logging.getLogger("urllib3").setLevel(logging.WARNING)
 
-    load_env()
+    load_dotenv()
     ok = run_all(args) if args.component == "all" else run_component(args.component, args)
     return 0 if ok else 1
 
