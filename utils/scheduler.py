@@ -1,31 +1,56 @@
-from apscheduler.schedulers.background import BackgroundScheduler
-import subprocess, sys, datetime, pathlib
-from scraper import nvd_scraper
+#!/usr/bin/env python3
+"""
+scheduler.py: Automate periodic scraping of NVD and The Hacker News.
+Run this script to schedule scrapes every 6 hours.
+"""
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
-PY   = sys.executable
+from apscheduler.schedulers.blocking import BlockingScheduler
+from datetime import datetime
+from scraper.hackernews_scraper import HackerNewsScraper
+from scraper.nvd_scraper import NVDScraper
 
-def _run_spider(spider_py):
-    subprocess.run([PY, "-m", "scrapy", "runspider", str(spider_py)],
-                   cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+# Paths to history files (ensure these match your project structure)
+HN_HISTORY = 'data/raw/hackernews/hackernews.json'
+NVD_HISTORY = 'data/raw/nvd/nvd_cleaned.json'
 
-def start():
-    sched = BackgroundScheduler(timezone="UTC")
 
-    # list of (id, callable) pairs ---------------------------
-    jobs = {
-        "hackernews":    lambda: _run_spider(ROOT/"scraper/hackernews_scraper.py"),
-        "krebs":         lambda: _run_spider(ROOT/"scraper/krebsonsecurity_scraper.py"),
-        "nvd":           lambda: nvd_scraper.pull_nvd(
-                                 (datetime.datetime.utcnow()-datetime.timedelta(hours=6)).isoformat()+"Z",
-                                 datetime.datetime.utcnow().isoformat()+"Z"),
-    }
+def scrape_hackernews():
+    """Run incremental scrape for The Hacker News."""
+    ts = datetime.utcnow().isoformat()
+    print(f"[{ts}] Starting HackerNews scrape...")
+    scraper = HackerNewsScraper(history_file=HN_HISTORY)
+    success = scraper.run()
+    status = "succeeded" if success else "failed"
+    print(f"[{datetime.utcnow().isoformat()}] HackerNews scrape {status}.")
 
-    now = datetime.datetime.utcnow()
 
-    # immediate run *and* schedule every 6 h
-    for jid, fn in jobs.items():
-        fn()  # ---- run right away
-        sched.add_job(fn, id=jid, trigger="interval", hours=6, next_run_time=now+datetime.timedelta(hours=6))
+def scrape_nvd():
+    """Run incremental update for NVD CVE data."""
+    ts = datetime.utcnow().isoformat()
+    print(f"[{ts}] Starting NVD incremental update...")
+    scraper = NVDScraper(history_file=NVD_HISTORY)
+    success = scraper.incremental_update()
+    status = "succeeded" if success else "failed"
+    print(f"[{datetime.utcnow().isoformat()}] NVD update {status}.")
 
-    sched.start()
+
+if __name__ == '__main__':
+    scheduler = BlockingScheduler(timezone='UTC')
+    now = datetime.utcnow()
+
+    # Schedule both scrapers: run at start, then every 6 hours
+    scheduler.add_job(
+        scrape_hackernews,
+        trigger='interval',
+        hours=6,
+        next_run_time=now
+    )
+    scheduler.add_job(
+        scrape_nvd,
+        trigger='interval',
+        hours=6,
+        next_run_time=now
+    )
+
+    print(f"[{datetime.utcnow().isoformat()}] Scheduler started: scraping every 6 hours.")
+    scheduler.start()
