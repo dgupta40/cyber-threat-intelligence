@@ -1,0 +1,68 @@
+# Urgency Score Analysis Summary
+
+## Current Weights
+- severity: 0.35
+- sentiment: 0.25
+- exploit: 0.15
+- patch: 0.15
+- recency: 0.10
+- articles: 0.05
+
+## Current Score Distribution
+- mean: 0.4839
+- median: 0.4990
+- std: 0.1214
+- min: 0.0258
+- max: 0.8814
+
+## Current Level Distribution
+- Low: 22349 records (12.5%)
+- Medium: 147966 records (82.8%)
+- High: 8481 records (4.7%)
+
+## Factor Contributions
+- severity: 0.2227 (46.0% of average score)
+- patch: 0.1288 (26.6% of average score)
+- sentiment: 0.1014 (20.9% of average score)
+- exploit: 0.0292 (6.0% of average score)
+- recency: 0.0016 (0.3% of average score)
+- articles: 0.0002 (0.0% of average score)
+
+## Most Sensitive Factors
+- Most sensitive factor: articles
+
+## Recommended Optimized Weights
+- articles: 0.05 (current: 0.05, change: +0.00)
+- exploit: 0.05 (current: 0.15, change: -0.10)
+- patch: 0.25 (current: 0.15, change: +0.10)
+- recency: 0.05 (current: 0.10, change: -0.05)
+- sentiment: 0.15 (current: 0.25, change: -0.10)
+- severity: 0.45 (current: 0.35, change: +0.10)
+
+## Optimization Metrics
+- Entropy: 0.9486
+- Score Variance: 0.0220
+- Balance Score: 0.7799
+
+## Level Distribution with Optimized Weights
+- Low: 12.1%
+- Medium: 55.3%
+- High: 32.5%
+
+## Correlation Analysis Findings
+Top correlated factors:
+- patch and text_length: -0.3222
+- exploit and text_length: 0.3194
+- days_old and recency: -0.2924
+
+## Suggested WEIGHTS Update
+```python
+WEIGHTS = {
+    'articles': 0.05,  # was 0.05
+    'exploit': 0.05,  # was 0.15
+    'patch': 0.25,  # was 0.15
+    'recency': 0.05,  # was 0.10
+    'sentiment': 0.15,  # was 0.25
+    'severity': 0.45,  # was 0.35
+}
+```
