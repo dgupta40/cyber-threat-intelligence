@@ -131,8 +131,13 @@ def analyze_factor_distributions(factor_data: pd.DataFrame):
     analysis_factors = [f for f in factor_data.columns 
                        if f not in ['days_old', 'n_articles_raw']]
     
+    # Calculate grid dimensions dynamically
+    n_factors = len(analysis_factors)
+    ncols = 3
+    nrows = (n_factors + ncols - 1) // ncols  # Ceiling division
+    
     # Plot histograms for all factors
-    fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+    fig, axes = plt.subplots(nrows, ncols, figsize=(15, 5*nrows))
     axes = axes.flatten()
     
     for i, factor in enumerate(analysis_factors):
@@ -148,6 +153,10 @@ def analyze_factor_distributions(factor_data: pd.DataFrame):
         ax.text(0.7, 0.9, f'Mean: {mean:.3f}\nMedian: {median:.3f}', 
                 transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.7))
     
+    # Hide any unused subplots
+    for i in range(n_factors, len(axes)):
+        axes[i].set_visible(False)
+    
     plt.tight_layout()
     plt.savefig(OUT_DIR / 'factor_distributions.png')
     plt.close()
@@ -157,6 +166,8 @@ def analyze_factor_distributions(factor_data: pd.DataFrame):
     factor_melted = factor_data[analysis_factors].melt(var_name='Factor', value_name='Value')
     sns.violinplot(x='Factor', y='Value', data=factor_melted)
     plt.title('Comparison of Factor Distributions')
+    plt.xticks(rotation=45)  # Add rotation for better readability
+    plt.tight_layout()
     plt.savefig(OUT_DIR / 'factor_comparison.png')
     plt.close()
     

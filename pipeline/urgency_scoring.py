@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Compute urgency score & urgency level for each CVE/article (2025-05-18).
+Compute urgency score & urgency level for each CVE/article.
 Factors: severity, sentiment, exploit presence, patch absence,
 exponential recency decay, and number of linked articles.
 """
@@ -20,11 +20,11 @@ DATA_FILE = Path("data/processed/master.parquet")
 OUT_FILE  = Path("data/processed/urgency_assessed.parquet")
 
 WEIGHTS = {
-    'severity':  0.35,  # CVSS-based
-    'sentiment': 0.25,  # negative tone boosts urgency
-    'exploit':   0.15,  # presence of exploit or PoC
-    'patch':     0.15,  # absence of patch/fix
-    'recency':   0.10,  # exponential decay over 30 days
+    'severity':  0.45,  # CVSS-based
+    'sentiment': 0.15,  # negative tone boosts urgency
+    'exploit':   0.05,  # presence of exploit or PoC
+    'patch':     0.25,  # absence of patch/fix
+    'recency':   0.05,  # exponential decay over 30 days
     'articles':  0.05,  # log-scaled article count
 }
 
