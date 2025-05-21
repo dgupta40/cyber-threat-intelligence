@@ -1,0 +1,16 @@
+              precision    recall  f1-score   support
+
+    Phishing       0.99      0.73      0.84      1372
+  Ransomware       0.55      0.43      0.48       217
+     Malware       0.97      0.73      0.83      1803
+SQLInjection       0.84      0.84      0.84       238
+         XSS       1.00      0.96      0.98      4862
+        DDoS       0.10      0.83      0.18        82
+     ZeroDay       0.24      0.86      0.38       149
+ SupplyChain       0.95      0.72      0.82       709
+       Other       0.00      0.00      0.00     27494
+
+   micro avg       0.87      0.22      0.35     36926
+   macro avg       0.63      0.68      0.59     36926
+weighted avg       0.24      0.22      0.23     36926
+ samples avg       0.20      0.20      0.19     36926
