@@ -1,0 +1,26 @@
+TF-IDF Parameter Analysis Results
+=================================
+
+Dataset: 2545 documents, 17602 unique terms
+
+Recommended Parameters:
+min_df=1, max_df=0.7
+
+Justification:
+- Vocabulary size: 14775 terms
+- Vocabulary coverage: 83.9% of unique terms
+- Matrix sparsity: 99.4%
+- Removed 0 low-frequency terms
+- Removed 0 high-frequency terms
+
+Top terms by TF-IDF importance with these parameters:
+1. vulnerability
+2. flaw
+3. security
+4. attack
+5. could
+6. critical
+7. microsoft
+8. google
+9. vulnerable
+10. attacker

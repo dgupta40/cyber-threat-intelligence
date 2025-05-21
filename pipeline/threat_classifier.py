@@ -24,7 +24,7 @@ import joblib
 DATA_FILE   = Path("data/processed/master.parquet")
 MODEL_DIR   = Path("models"); MODEL_DIR.mkdir(exist_ok=True)
 
-# Paths to the SBERT outputs you already saved
+# Paths to the SBERT outputs
 SBERT_NVD   = MODEL_DIR / "sbert_nvd.npy"
 SBERT_THN   = MODEL_DIR / "sbert_thn.npy"
 

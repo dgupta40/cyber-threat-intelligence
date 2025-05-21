@@ -121,6 +121,19 @@ def load_raw() -> pd.DataFrame:
             continue
     return pd.DataFrame(recs)
 
+def remove_stopwords_and_lemmatize(txt: str) -> str:
+    """
+    Tokenize text, drop any stop-word, lemmatize each token, 
+    and re-join into a cleaned string.
+    """
+    tokens = word_tokenize(txt)
+    processed = [
+        lemmatizer.lemmatize(tok)
+        for tok in tokens
+        if tok.isalpha() and tok.lower() not in STOPWORDS
+    ]
+    return " ".join(processed)
+
 # MAIN
 
 def main():
@@ -143,6 +156,7 @@ def main():
         .apply(clean_html)
         .apply(generic_clean)
         .apply(cyber_normalise)
+        .apply(remove_stopwords_and_lemmatize)
     )
     # drop empty clean_text rows
     df_nvd = df_nvd[df_nvd.clean_text.str.strip().ne("")].reset_index(drop=True)
@@ -154,6 +168,7 @@ def main():
         .apply(clean_html)
         .apply(generic_clean)
         .apply(cyber_normalise)
+        .apply(remove_stopwords_and_lemmatize)
     )
     # drop empty clean_text rows
     df_thn = df_thn[df_thn.clean_text.str.strip().ne("")].reset_index(drop=True)
