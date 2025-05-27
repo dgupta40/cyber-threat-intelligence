@@ -40,6 +40,7 @@ MODEL_DIR = Path("models");         MODEL_DIR.mkdir(parents=True, exist_ok=True)
 STOPWORDS   = set(stopwords.words("english"))
 lemmatizer  = WordNetLemmatizer()
 
+# REGEX
 URL_RE      = re.compile(r"http[s]?://\S+")
 EMAIL_RE    = re.compile(r"\S+@\S+")
 MD5_RE      = re.compile(r"\b[a-fA-F0-9]{32}\b")
@@ -84,7 +85,8 @@ def cyber_normalise(txt: str) -> str:
     return txt
 
 def cvss_bin(score) -> str:
-    """Bin CVSS score into low/medium/high/critical."""
+    """Bin CVSS score into low/medium/high/critical.""" # NIST CVSS v3.0
+    if score is None: return "unknown"
     try:
         s = float(score)
         if s < 4: return "low"

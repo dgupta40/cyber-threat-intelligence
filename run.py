@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CLI entry-point for the AI-Driven Cyber-Threat-Intelligence system.
+CLI entry-point for Cyber-Threat-Intelligence system.
 
 Run individual stages, or the full pipeline:
 
@@ -9,6 +9,7 @@ Run individual stages, or the full pipeline:
     python run.py --component categorize
     python run.py --component urgency
     python run.py --component detect_anomalies
+    python run.py --component dashboard
     python run.py --component all --dashboard
 """
 

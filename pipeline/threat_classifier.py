@@ -87,7 +87,8 @@ def main():
     log.info("Loading SBERT embeddings")
     emb_nvd = np.load(SBERT_NVD)
     emb_thn = np.load(SBERT_THN)
-    # assumes master.parquet was built as [all NVD rows, then all THN rows]
+    
+    # all NVD rows, then all THN rows
     X_emb = csr_matrix(np.vstack([emb_nvd, emb_thn]))
 
     # 6) combine everything
