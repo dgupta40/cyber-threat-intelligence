@@ -10,8 +10,11 @@ analyze_linked_cves.py — Post-linking analysis script
 import pandas as pd
 import matplotlib.pyplot as plt
 
-def analyze_linked_cves(input_csv="data/processed/master_linked.csv",
-                        output_csv="data/processed/linked_nvd_only.csv"):
+
+def analyze_linked_cves(
+    input_csv="data/processed/master_linked.csv",
+    output_csv="data/processed/linked_nvd_only.csv",
+):
     print(f" Loading: {input_csv}")
     df = pd.read_csv(input_csv, low_memory=False)
 
@@ -34,6 +37,7 @@ def analyze_linked_cves(input_csv="data/processed/master_linked.csv",
     plt.grid(axis="y", linestyle="--", alpha=0.6)
     plt.tight_layout()
     plt.show()
+
 
 if __name__ == "__main__":
     analyze_linked_cves()

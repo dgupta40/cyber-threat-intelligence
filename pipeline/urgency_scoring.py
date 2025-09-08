@@ -17,20 +17,21 @@ import pandas as pd
 # ──────────────────────────────────────────────────────────────────────────────
 
 DATA_FILE = Path("data/processed/master.parquet")
-OUT_FILE  = Path("data/processed/urgency_assessed.parquet")
+OUT_FILE = Path("data/processed/urgency_assessed.parquet")
 
 WEIGHTS = {
-    'severity':  0.45,  # CVSS-based
-    'sentiment': 0.15,  # negative tone boosts urgency
-    'exploit':   0.05,  # presence of exploit or PoC
-    'patch':     0.25,  # absence of patch/fix
-    'recency':   0.05,  # exponential decay over 30 days
-    'articles':  0.05,  # log-scaled article count
+    "severity": 0.45,  # CVSS-based
+    "sentiment": 0.15,  # negative tone boosts urgency
+    "exploit": 0.05,  # presence of exploit or PoC
+    "patch": 0.25,  # absence of patch/fix
+    "recency": 0.05,  # exponential decay over 30 days
+    "articles": 0.05,  # log-scaled article count
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
 # CORE FUNCTIONS
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def compute_urgency(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -39,54 +40,61 @@ def compute_urgency(df: pd.DataFrame) -> pd.DataFrame:
     now = datetime.utcnow()
 
     # Ensure published_date is datetime
-    df['published_date'] = pd.to_datetime(df['published_date'], errors='coerce')
+    df["published_date"] = pd.to_datetime(df["published_date"], errors="coerce")
 
-    severity = df['cvss_score'].fillna(0) / 10.0
-    sentiment = (df['sentiment'].fillna(0) + 1) / 2.0
-    exploit = df['clean_text'].str.contains(
-        r'exploit|poc|proof of concept', case=False, na=False).astype(int)
-    patch = 1 - df['clean_text'].str.contains(
-        r'patch|fix|update', case=False, na=False).astype(int)
+    severity = df["cvss_score"].fillna(0) / 10.0
+    sentiment = (df["sentiment"].fillna(0) + 1) / 2.0
+    exploit = (
+        df["clean_text"]
+        .str.contains(r"exploit|poc|proof of concept", case=False, na=False)
+        .astype(int)
+    )
+    patch = 1 - df["clean_text"].str.contains(
+        r"patch|fix|update", case=False, na=False
+    ).astype(int)
 
-    days = df['published_date'].apply(
-        lambda d: (now - d).days if not pd.isna(d) else 365
-    ).clip(lower=0)
+    days = (
+        df["published_date"]
+        .apply(lambda d: (now - d).days if not pd.isna(d) else 365)
+        .clip(lower=0)
+    )
     recency = days.div(30).apply(lambda x: math.exp(-x))
 
-    if 'n_articles' in df.columns:
-        articles = df['n_articles'].fillna(0).apply(
-            lambda x: math.log1p(x) / math.log1p(10)
+    if "n_articles" in df.columns:
+        articles = (
+            df["n_articles"].fillna(0).apply(lambda x: math.log1p(x) / math.log1p(10))
         )
     else:
         articles = 0
 
     score = (
-        severity * WEIGHTS['severity'] +
-        sentiment * WEIGHTS['sentiment'] +
-        exploit * WEIGHTS['exploit'] +
-        patch * WEIGHTS['patch'] +
-        recency * WEIGHTS['recency'] +
-        articles * WEIGHTS['articles']
+        severity * WEIGHTS["severity"]
+        + sentiment * WEIGHTS["sentiment"]
+        + exploit * WEIGHTS["exploit"]
+        + patch * WEIGHTS["patch"]
+        + recency * WEIGHTS["recency"]
+        + articles * WEIGHTS["articles"]
     )
 
     df = df.copy()
-    df['urgency_score'] = score
-    df['urgency_level'] = pd.cut(
+    df["urgency_score"] = score
+    df["urgency_level"] = pd.cut(
         score,
         bins=[0.0, 0.33, 0.66, 1.01],
-        labels=['Low', 'Medium', 'High'],
-        right=False
+        labels=["Low", "Medium", "High"],
+        right=False,
     )
     return df
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # ENTRYPOINT
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def main():
     logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s | %(levelname)s | %(message)s"
+        level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s"
     )
     log = logging.getLogger("urgency")
 
@@ -98,8 +106,9 @@ def main():
 
     log.info(f"Saving results to {OUT_FILE}")
     df_out.to_parquet(OUT_FILE, index=False)
-    df_out.to_csv(OUT_FILE.with_suffix('.csv'), index=False)
+    df_out.to_csv(OUT_FILE.with_suffix(".csv"), index=False)
     log.info(f"Saved {len(df_out)} urgency scores to {OUT_FILE}")
+
 
 if __name__ == "__main__":
     main()

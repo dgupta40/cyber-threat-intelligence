@@ -22,7 +22,7 @@ def load_from_json(path: str) -> any:
     try:
         if os.path.getsize(path) > 200 * 1024 * 1024:
             with opener(path, "rb") as fh:
-                return list(ijson.items(fh, ''))
+                return list(ijson.items(fh, ""))
         with opener(path, "rt", encoding="utf-8") as fh:
             return json.load(fh)
     except Exception as e:

@@ -6,6 +6,7 @@ a confusion matrix and F1‐score bar chart.
 
 import sys
 from pathlib import Path
+
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 import logging
 from pathlib import Path
@@ -27,14 +28,15 @@ from sklearn.metrics import (
 # CONFIGURATION
 # ──────────────────────────────────────────────────────────────────────────────
 
-DATA_FILE  = Path("data/processed/master.parquet")
+DATA_FILE = Path("data/processed/master.parquet")
 MODEL_FILE = Path("models/threat_model_with_sbert.pkl")
-OUT_DIR    = Path("analysis/categorization")
+OUT_DIR = Path("analysis/categorization")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # HELPERS
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def build_labels(df: pd.DataFrame) -> np.ndarray:
     """
@@ -64,12 +66,16 @@ def build_labels(df: pd.DataFrame) -> np.ndarray:
     mlb = joblib.load(MODEL_FILE)["mlb"]
     return mlb.transform(y_labels), mlb.classes_
 
+
 # ──────────────────────────────────────────────────────────────────────────────
 # MAIN
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def main():
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s"
+    )
     log = logging.getLogger("categorization_analysis")
 
     log.info("Loading data & model")
@@ -97,7 +103,9 @@ def main():
     ypred = clf.predict(Xte)
 
     # 5) classification report
-    report = classification_report(yte, ypred, target_names=categories, output_dict=True)
+    report = classification_report(
+        yte, ypred, target_names=categories, output_dict=True
+    )
     rpt_df = pd.DataFrame(report).transpose()
     rpt_df.to_csv(OUT_DIR / "classification_report.csv")
     log.info(f"Saved classification report to {OUT_DIR/'classification_report.csv'}")
@@ -106,7 +114,7 @@ def main():
     log.info("Plotting confusion matrix")
     cm = confusion_matrix(yte.argmax(axis=1), ypred.argmax(axis=1))
     disp = ConfusionMatrixDisplay(cm, display_labels=categories)
-    fig, ax = plt.subplots(figsize=(9,9))
+    fig, ax = plt.subplots(figsize=(9, 9))
     disp.plot(ax=ax, xticks_rotation=45, cmap="Blues", colorbar=False)
     plt.title("Threat Categorization Confusion Matrix")
     plt.tight_layout()
@@ -117,10 +125,10 @@ def main():
     # 7) F1‐score bar chart
     log.info("Plotting F1‐scores")
     f1_scores = rpt_df.loc[categories, "f1-score"]
-    plt.figure(figsize=(8,4))
+    plt.figure(figsize=(8, 4))
     sns.barplot(x=f1_scores.values, y=categories)
     plt.xlabel("F1 Score")
-    plt.xlim(0,1)
+    plt.xlim(0, 1)
     plt.title("F1‐score by Threat Category")
     plt.tight_layout()
     plt.savefig(OUT_DIR / "f1_scores.png", dpi=300)
