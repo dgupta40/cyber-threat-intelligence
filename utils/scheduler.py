@@ -10,8 +10,8 @@ from scraper.hackernews_scraper import HackerNewsScraper
 from scraper.nvd_scraper import NVDScraper
 
 # Paths to history files (ensure these match your project structure)
-HN_HISTORY = 'data/raw/hackernews/hackernews.json'
-NVD_HISTORY = 'data/raw/nvd/nvd_cleaned.json'
+HN_HISTORY = "data/raw/hackernews/hackernews.json"
+NVD_HISTORY = "data/raw/nvd/nvd_cleaned.json"
 
 
 def scrape_hackernews():
@@ -34,23 +34,15 @@ def scrape_nvd():
     print(f"[{datetime.utcnow().isoformat()}] NVD update {status}.")
 
 
-if __name__ == '__main__':
-    scheduler = BlockingScheduler(timezone='UTC')
+if __name__ == "__main__":
+    scheduler = BlockingScheduler(timezone="UTC")
     now = datetime.utcnow()
 
     # Schedule both scrapers: run at start, then every 6 hours
-    scheduler.add_job(
-        scrape_hackernews,
-        trigger='interval',
-        hours=6,
-        next_run_time=now
-    )
-    scheduler.add_job(
-        scrape_nvd,
-        trigger='interval',
-        hours=6,
-        next_run_time=now
-    )
+    scheduler.add_job(scrape_hackernews, trigger="interval", hours=6, next_run_time=now)
+    scheduler.add_job(scrape_nvd, trigger="interval", hours=6, next_run_time=now)
 
-    print(f"[{datetime.utcnow().isoformat()}] Scheduler started: scraping every 6 hours.")
+    print(
+        f"[{datetime.utcnow().isoformat()}] Scheduler started: scraping every 6 hours."
+    )
     scheduler.start()

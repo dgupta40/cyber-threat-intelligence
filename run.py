@@ -27,6 +27,7 @@ from preprocessing.clean_text import main as preprocess_main
 import pipeline.threat_classifier as threat_classifier
 from pipeline.urgency_scoring import main as urgency_main
 from pipeline.anomaly_detection import main as anomaly_main
+
 # ──────────────────────────────────────────────────────────────────────────────
 ROOT = Path(__file__).resolve().parent
 sys.path.append(str(ROOT))
@@ -115,12 +116,22 @@ def main() -> int:
     p = argparse.ArgumentParser(description="Cyber-Threat-Intelligence CLI")
     p.add_argument(
         "--component",
-        choices=["scrape","preprocess","categorize","urgency","detect_anomalies","dashboard","all"],
-        default="all"
+        choices=[
+            "scrape",
+            "preprocess",
+            "categorize",
+            "urgency",
+            "detect_anomalies",
+            "dashboard",
+            "all",
+        ],
+        default="all",
     )
-    p.add_argument("--source", choices=["hackernews","nvd","all"], default="all")
+    p.add_argument("--source", choices=["hackernews", "nvd", "all"], default="all")
     p.add_argument("--dashboard", action="store_true")
-    p.add_argument("--log-level", choices=["DEBUG","INFO","WARNING","ERROR"], default="INFO")
+    p.add_argument(
+        "--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="INFO"
+    )
     args = p.parse_args()
 
     LOGS_DIR.mkdir(exist_ok=True)
@@ -128,13 +139,18 @@ def main() -> int:
     logging.basicConfig(
         level=getattr(logging, args.log_level),
         format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
-        handlers=[logging.FileHandler(logfile), logging.StreamHandler()]
+        handlers=[logging.FileHandler(logfile), logging.StreamHandler()],
     )
     logging.getLogger("urllib3").setLevel(logging.WARNING)
 
     load_dotenv()
-    ok = run_all(args) if args.component == "all" else run_component(args.component, args)
+    ok = (
+        run_all(args)
+        if args.component == "all"
+        else run_component(args.component, args)
+    )
     return 0 if ok else 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

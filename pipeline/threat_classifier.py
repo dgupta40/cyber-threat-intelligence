@@ -21,36 +21,54 @@ from sklearn.metrics import classification_report
 import joblib
 
 # ──────────────────────────────────────────────────────────────────────────────
-DATA_FILE   = Path("data/processed/master.parquet")
-MODEL_DIR   = Path("models"); MODEL_DIR.mkdir(exist_ok=True)
+DATA_FILE = Path("data/processed/master.parquet")
+MODEL_DIR = Path("models")
+MODEL_DIR.mkdir(exist_ok=True)
 
 # Paths to the SBERT outputs
-SBERT_NVD   = MODEL_DIR / "sbert_nvd.npy"
-SBERT_THN   = MODEL_DIR / "sbert_thn.npy"
+SBERT_NVD = MODEL_DIR / "sbert_nvd.npy"
+SBERT_THN = MODEL_DIR / "sbert_thn.npy"
 
-CATEGORIES  = ["Phishing","Ransomware","Malware","SQLInjection","XSS",
-               "DDoS","ZeroDay","SupplyChain","Other"]
+CATEGORIES = [
+    "Phishing",
+    "Ransomware",
+    "Malware",
+    "SQLInjection",
+    "XSS",
+    "DDoS",
+    "ZeroDay",
+    "SupplyChain",
+    "Other",
+]
 CATEGORY_PATTERNS = {
-    "Phishing":      [r"phish", r"credential", r"email scam", r"spoof"],
-    "Ransomware":    [r"ransom", r"crypto.*currency", r"file.*locked"],
-    "Malware":       [r"malware", r"trojan", r"virus", r"worm"],
-    "SQLInjection":  [r"sql.*injection", r"database.*injection"],
-    "XSS":           [r"cross.?site.?script", r"xss"],
-    "DDoS":          [r"denial.?of.?service", r"ddos"],
-    "ZeroDay":       [r"zero.?day", r"0.?day", r"unpatched"],
-    "SupplyChain":   [r"supply.?chain", r"vendor", r"third.?party"]
+    "Phishing": [r"phish", r"credential", r"email scam", r"spoof"],
+    "Ransomware": [r"ransom", r"crypto.*currency", r"file.*locked"],
+    "Malware": [r"malware", r"trojan", r"virus", r"worm"],
+    "SQLInjection": [r"sql.*injection", r"database.*injection"],
+    "XSS": [r"cross.?site.?script", r"xss"],
+    "DDoS": [r"denial.?of.?service", r"ddos"],
+    "ZeroDay": [r"zero.?day", r"0.?day", r"unpatched"],
+    "SupplyChain": [r"supply.?chain", r"vendor", r"third.?party"],
 }
-CWE_MAP = {"CWE-79":"XSS","CWE-89":"SQLInjection","CWE-119":"Malware"}
+CWE_MAP = {"CWE-79": "XSS", "CWE-89": "SQLInjection", "CWE-119": "Malware"}
+
 
 def rule_labels(text: str) -> list[str]:
     if not isinstance(text, str):
         return []
     txt = text.lower()
-    return [cat for cat,pats in CATEGORY_PATTERNS.items() if any(re.search(p, txt) for p in pats)]
+    return [
+        cat
+        for cat, pats in CATEGORY_PATTERNS.items()
+        if any(re.search(p, txt) for p in pats)
+    ]
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 def main():
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s"
+    )
     log = logging.getLogger("threat_classifier")
 
     # 1) load data
@@ -71,14 +89,14 @@ def main():
         seeds += rule_labels(row.clean_text)
         y_labels.append(list(set(seeds)) or ["Other"])
     mlb = MultiLabelBinarizer(classes=CATEGORIES)
-    y   = mlb.fit_transform(y_labels)
+    y = mlb.fit_transform(y_labels)
 
     # 3) text features
-    tfidf = TfidfVectorizer(max_features=2000, min_df=2, max_df=0.7, ngram_range=(1,2))
+    tfidf = TfidfVectorizer(max_features=2000, min_df=2, max_df=0.7, ngram_range=(1, 2))
     X_txt = tfidf.fit_transform(df.clean_text)
 
     # 4) numeric features
-    num_cols = ["sentiment","cvss_score"]
+    num_cols = ["sentiment", "cvss_score"]
     if "n_articles" in df.columns:
         num_cols.append("n_articles")
     X_num = csr_matrix(df[num_cols].fillna(0).values)
@@ -87,7 +105,7 @@ def main():
     log.info("Loading SBERT embeddings")
     emb_nvd = np.load(SBERT_NVD)
     emb_thn = np.load(SBERT_THN)
-    
+
     # all NVD rows, then all THN rows
     X_emb = csr_matrix(np.vstack([emb_nvd, emb_thn]))
 
@@ -97,7 +115,9 @@ def main():
     # 7) split, train, evaluate
     Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, random_state=42)
     log.info("Training RandomForest (n_estimators=80, parallel)")
-    rf  = RandomForestClassifier(n_estimators=80, class_weight="balanced", random_state=42, n_jobs=-1)
+    rf = RandomForestClassifier(
+        n_estimators=80, class_weight="balanced", random_state=42, n_jobs=-1
+    )
     clf = OneVsRestClassifier(rf, n_jobs=-1)
     clf.fit(Xtr, ytr)
 
@@ -106,13 +126,12 @@ def main():
     print(classification_report(yte, y_pred, target_names=CATEGORIES))
 
     # 8) persist model + vectorizers
-    joblib.dump({
-        "model":    clf,
-        "tfidf":    tfidf,
-        "mlb":      mlb,
-        "num_cols": num_cols
-    }, MODEL_DIR/"threat_model_with_sbert.pkl")
+    joblib.dump(
+        {"model": clf, "tfidf": tfidf, "mlb": mlb, "num_cols": num_cols},
+        MODEL_DIR / "threat_model_with_sbert.pkl",
+    )
     log.info(f"Saved model to {MODEL_DIR/'threat_model_with_sbert.pkl'}")
+
 
 if __name__ == "__main__":
     main()
