@@ -7,17 +7,17 @@ exponential recency decay, and number of linked articles.
 
 import logging
 import math
-from pathlib import Path
 from datetime import datetime
 
 import pandas as pd
+from database import load_table, save_table
 
 # ──────────────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ──────────────────────────────────────────────────────────────────────────────
 
-DATA_FILE = Path("data/processed/master.parquet")
-OUT_FILE = Path("data/processed/urgency_assessed.parquet")
+DATA_TABLE = "master"
+OUT_TABLE = "urgency_assessed"
 
 WEIGHTS = {
     "severity": 0.45,  # CVSS-based
@@ -98,16 +98,15 @@ def main():
     )
     log = logging.getLogger("urgency")
 
-    log.info(f"Loading data from {DATA_FILE}")
-    df = pd.read_parquet(DATA_FILE)
+    log.info(f"Loading data from table {DATA_TABLE}")
+    df = load_table(DATA_TABLE)
 
     log.info(f"Computing urgency scores for {len(df)} rows")
     df_out = compute_urgency(df)
 
-    log.info(f"Saving results to {OUT_FILE}")
-    df_out.to_parquet(OUT_FILE, index=False)
-    df_out.to_csv(OUT_FILE.with_suffix(".csv"), index=False)
-    log.info(f"Saved {len(df_out)} urgency scores to {OUT_FILE}")
+    log.info(f"Saving results to table {OUT_TABLE}")
+    save_table(df_out, OUT_TABLE)
+    log.info(f"Saved {len(df_out)} urgency scores to {OUT_TABLE} table")
 
 
 if __name__ == "__main__":

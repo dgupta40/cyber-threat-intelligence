@@ -11,6 +11,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from database import load_table
 from scipy.sparse import hstack, csr_matrix
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import MultiLabelBinarizer
@@ -21,7 +22,7 @@ from sklearn.metrics import classification_report
 import joblib
 
 # ──────────────────────────────────────────────────────────────────────────────
-DATA_FILE = Path("data/processed/master.parquet")
+DATA_TABLE = "master"
 MODEL_DIR = Path("models")
 MODEL_DIR.mkdir(exist_ok=True)
 
@@ -72,7 +73,7 @@ def main():
     log = logging.getLogger("threat_classifier")
 
     # 1) load data
-    df = pd.read_parquet(DATA_FILE)
+    df = load_table(DATA_TABLE)
     df = df[df.clean_text.str.strip().ne("")]
 
     # 1b) drop null or all-whitespace clean_text rows

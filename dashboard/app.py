@@ -13,6 +13,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
+from database import load_table
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
@@ -115,7 +116,7 @@ st.markdown(
 )
 
 # Data paths
-DATA_DIR = ROOT / "data/processed"
+DB_PATH = ROOT / "data/processed/cti.db"
 MODEL_DIR = ROOT / "models"
 
 # Initialize session state
@@ -235,40 +236,24 @@ def apply_threat_classification(df, _model_data):
 def load_data():
     """Load and prepare data with robust error handling."""
     try:
-        # Check if data directory exists
-        if not DATA_DIR.exists():
+        if not DB_PATH.exists():
             return (
                 None,
                 None,
                 None,
-                "Data directory not found. Please run the pipeline first.",
+                "Database not found. Please run the pipeline first.",
             )
 
-        # Load master data
-        master_path = DATA_DIR / "master.parquet"
-        if not master_path.exists():
-            return (
-                None,
-                None,
-                None,
-                "Master data not found. Please run preprocessing first.",
-            )
+        df_master = load_table("master", DB_PATH)
+        try:
+            df_urgency = load_table("urgency_assessed", DB_PATH)
+        except Exception:
+            df_urgency = df_master.copy()
 
-        df_master = pd.read_parquet(master_path)
-
-        # Load urgency data if exists
-        urgency_path = DATA_DIR / "urgency_assessed.parquet"
-        df_urgency = (
-            pd.read_parquet(urgency_path) if urgency_path.exists() else df_master.copy()
-        )
-
-        # Load emerging threats if exists
-        emerging_path = DATA_DIR / "emerging_threats.parquet"
-        df_emerging = (
-            pd.read_parquet(emerging_path)
-            if emerging_path.exists()
-            else df_urgency.copy()
-        )
+        try:
+            df_emerging = load_table("emerging_threats", DB_PATH)
+        except Exception:
+            df_emerging = df_urgency.copy()
 
         # Add missing columns with defaults
         if "urgency_score" not in df_urgency.columns:
