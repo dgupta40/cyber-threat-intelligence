@@ -8,15 +8,15 @@ Methods:
   - Isolation Forest anomaly detection on sparse random projections of TF-IDF text
 
 Outputs:
-  - data/processed/emerging_threats.parquet with boolean 'emerging' flag
+  - table 'emerging_threats' in data/processed/cti.db with boolean 'emerging' flag
 """
 
 import logging
-from pathlib import Path
 from datetime import datetime
 
 import numpy as np
 import pandas as pd
+from database import load_table, save_table
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.ensemble import IsolationForest
 from sklearn.random_projection import SparseRandomProjection
@@ -25,8 +25,8 @@ from sklearn.random_projection import SparseRandomProjection
 # CONFIGURATION
 # ──────────────────────────────────────────────────────────────────────────────
 
-DATA_FILE = Path("data/processed/urgency_assessed.parquet")
-OUT_FILE = Path("data/processed/emerging_threats.parquet")
+DATA_TABLE = "urgency_assessed"
+OUT_TABLE = "emerging_threats"
 ZERO_DAY_PATTERN = r"zero.?day|0.?day|unpatched"
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -75,14 +75,14 @@ def main():
     )
     log = logging.getLogger("anomaly_detection")
 
-    log.info(f"Loading data from {DATA_FILE}")
-    df = pd.read_parquet(DATA_FILE)
+    log.info(f"Loading data from table {DATA_TABLE}")
+    df = load_table(DATA_TABLE)
 
     log.info(f"Running emerging threat detection over {len(df)} rows")
     df_out = detect_emerging(df)
 
-    log.info(f"Saving results to {OUT_FILE}")
-    df_out.to_parquet(OUT_FILE, index=False)
+    log.info(f"Saving results to table {OUT_TABLE}")
+    save_table(df_out, OUT_TABLE)
     log.info(f"Saved emerging threats: {df_out['emerging'].sum()} flagged rows")
 
 

@@ -10,7 +10,7 @@ CTI preprocessing & THN→NVD linking
 – TF‑IDF on THN (min_df=3, max_df=0.8)
 – SBERT embeddings (all-MiniLM-L6-v2)
 – Integrated CVE->article linking (n_articles, linked_articles, earliest_article_date)
-Outputs: data/processed/master.parquet and master.csv
+Outputs: data/processed/cti.db table 'master'
 """
 
 import json
@@ -30,6 +30,7 @@ from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from tqdm.auto import tqdm
 from transformers import pipeline
+from database import save_table
 
 # CONFIGURATION
 
@@ -249,9 +250,8 @@ def main():
 
     # — Combine & save —
     df_master = pd.concat([df_nvd, df_thn], ignore_index=True, sort=False)
-    df_master.to_parquet(PROC_DIR / "master.parquet", index=False)
-    df_master.to_csv(PROC_DIR / "master.csv", index=False)
-    logging.warning(f"Saved master.parquet with {len(df_master)} rows.")
+    save_table(df_master, "master")
+    logging.warning(f"Saved master table with {len(df_master)} rows.")
 
 
 if __name__ == "__main__":
